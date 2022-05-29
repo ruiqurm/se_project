@@ -1,0 +1,2 @@
+pydantic
+tortoise-orm[asyncpg]
