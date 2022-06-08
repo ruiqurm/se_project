@@ -3,7 +3,7 @@
 """
 from .charge_station import ChargeStation
 from .transaction import Transaction
-from .scheduler import Scheduler
+from .schedule import Scheduler
 import asyncio
 import threading
 class Driver:

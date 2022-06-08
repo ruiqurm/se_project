@@ -4,12 +4,14 @@
 
 from .settings import Settings
 from .transaction import Transaction
+from .charge_station import ChargeStation
 import numpy as np
 
 class Scheduler:
 	def __init__(self):
 		self.areaMngt=AreaMgmt()
-	def on_finish(self,station_id):
+	def on_finish(self,station:ChargeStation):
+		station_id = station.ID
 		#完成充电
 		self.areaMngt.finish(station_id)
 		#为充电桩调度
@@ -19,7 +21,8 @@ class Scheduler:
 		Transaction.start(station_id)
 		return 1
 
-	def on_error(self,stationId):
+	def on_error(self,station:ChargeStation):
+		stationId = station.ID
 		#获取充电队列
 		charging_queue=self.areaMgmt.charging[stationId]
 		#
@@ -31,20 +34,27 @@ class Scheduler:
 		AreaMgmt.lock_waitingArea()
 		#调度事件
 
-	def on_push(self,userId,model,charging):
+	def on_push(self,tran:Transaction):
+
+		raise
 		ret=AreaMgmt.push(userId,model,charging)
 		return ret
-	def on_update_mode(self,uid,mode):
+	def on_update_mode(self,tran:Transaction,mode:int):
+
+		raise
 		ret=AreaMgmt.update_mode(uid,mode)
 		pass
-	def on_update_quantity(self,uid,value):
-		ret=AreaMgmt.update_quantity(uid,value)
+	def on_update_quantity(self,tran:Transaction,value:float):
+		raise
+		# ret=AreaMgmt.update_quantity(uid,value)
 		pass
-	def on_cancel(self,uid):
-		pass
-	def on_station_on(self):
-		pass
-	def on_station_off(self):
+	def on_cancel(self,tran:Transaction):
+		raise
+
+	def on_station_on(self,station:ChargeStation):
+		raise
+
+	def on_station_off(self,station:ChargeStation):
 		pass
 
 
