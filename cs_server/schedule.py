@@ -10,7 +10,12 @@ import numpy as np
 class Scheduler:
 	def __init__(self):
 		self.areaMngt=AreaMgmt()
-	def on_finish(self,station:ChargeStation):
+	def on_finish(self,station:ChargeStation)->None:
+		"""完成充电
+
+		Args:
+			station (ChargeStation): 完成充电的充电桩
+		"""
 		station_id = station.ID
 		#完成充电
 		self.areaMngt.finish(station_id)
@@ -21,8 +26,13 @@ class Scheduler:
 		Transaction.start(station_id)
 		return 1
 
-	def on_error(self,station:ChargeStation):
-		stationId = station.ID
+	def on_error(self,station_id:str)->None:
+		"""充电桩出现异常
+
+		Args:
+			station (str): 出现异常的充电桩
+		"""
+		stationId = station_id
 		#获取充电队列
 		charging_queue=self.areaMgmt.charging[stationId]
 		#
@@ -35,26 +45,56 @@ class Scheduler:
 		#调度事件
 
 	def on_push(self,tran:Transaction):
+		"""充电事务提交了
 
+		Args:
+			tran (Transaction): 提交的事务，内部有用户对象
+		"""
 		raise
 		ret=AreaMgmt.push(userId,model,charging)
 		return ret
 	def on_update_mode(self,tran:Transaction,mode:int):
+		"""充电订单模式更新模式
 
+		Args:
+			tran (Transaction): 充电事务
+			mode (int): 模式，这里暂定为int
+		"""
 		raise
 		ret=AreaMgmt.update_mode(uid,mode)
 		pass
 	def on_update_quantity(self,tran:Transaction,value:float):
+		"""充电订单模式更新充电量
+
+		Args:
+			tran (Transaction): 充电事务
+			value (float): 充电量
+		"""
 		raise
 		# ret=AreaMgmt.update_quantity(uid,value)
 		pass
 	def on_cancel(self,tran:Transaction):
+		"""充电事务取消
+
+		Args:
+			tran (Transaction): 充电事务
+		"""
 		raise
 
-	def on_station_on(self,station:ChargeStation):
+	def on_station_on(self,station_id:str):
+		"""充电桩启动
+
+		Args:
+			station (ChargeStation): 充电桩
+		"""
 		raise
 
-	def on_station_off(self,station:ChargeStation):
+	def on_station_off(self,station_id:str):
+		"""充电桩关闭
+
+		Args:
+			station (str): 充电桩
+		"""
 		pass
 
 

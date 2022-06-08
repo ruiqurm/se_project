@@ -21,20 +21,20 @@ class Driver:
 
 	def signal_station_off(self,station:ChargeStation)->None:
 		# asyncio.create_task(self.scheduler.on_station_off())
-		t = threading.Thread(target=self.scheduler.on_station_off, args=(station,))
+		t = threading.Thread(target=self.scheduler.on_station_off, args=(station.id,))
 		t.start()
 
 	def signal_station_on(self,station:ChargeStation)->None:
 		# asyncio.create_task(self.scheduler.on_station_on())
-		t = threading.Thread(target=self.scheduler.on_station_on, args=(station,))
+		t = threading.Thread(target=self.scheduler.on_station_on, args=(station.id,))
 		t.start()
 
 	def signal_station_finish(self,station:ChargeStation)->None:
 		# asyncio.create_task(self.scheduler.on_station_on())
-		t = threading.Thread(target=self.scheduler.on_finish, args=(station,))
+		t = threading.Thread(target=self.scheduler.on_finish, args=(station.id,))
 		t.start()
 
 	def signal_station_error(self,station:ChargeStation)->None:
 		# asyncio.create_task(self.scheduler.on_station_on())
-		t = threading.Thread(target=self.scheduler.on_error, args=(station,))
+		t = threading.Thread(target=self.scheduler.on_error, args=(station.id,))
 		t.start()		
