@@ -9,23 +9,23 @@ from .settings import Settings
 
 def encode(obj:str)->str:
 	f = Fernet(Settings.SECRET_KEY)
-	f.encrypt_at_time(obj, time.time())
+	return f.encrypt_at_time(obj.encode(), int(time.time())).decode()
 
-def decode(token:str)->str:
+def decode(token:str)->Optional[str]:
 	f = Fernet(Settings.SECRET_KEY)
 	try:
-		obj = f.decrypt_at_time(token,Settings.USER_LOGIN_TTL,time.time())
+		obj = f.decrypt_at_time(token.encode(),Settings.USER_LOGIN_TTL,int(time.time()))
 	except Exception:
 		return None
 	else:
-		return obj 
+		return obj.decode()
 class User:
 	id : str
 	username : str
 
 	def get_running_transaction(self)->Optional[Transaction]:
 		return Transaction.get_running_transaction(self)
-	
+
 	def get_all_transactions(self)->List[Transaction]:
 		return Transaction.get_all_transactions(self)
 

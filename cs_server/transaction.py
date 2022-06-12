@@ -3,10 +3,10 @@
 """
 from datetime import datetime, timedelta
 from typing import List, Optional, Union
-from .user import User
+# from .user import User
 class Transaction:
 	id : str
-	user : User
+	user : 'User'
 	mode : int
 	start_time : datetime
 	end_time : datetime
@@ -36,13 +36,13 @@ class Transaction:
 		pass
 
 	@classmethod
-	def get_running_transaction(cls,user:User)->Optional['Transaction']:
+	def get_running_transaction(cls,user:'User')->Optional['Transaction']:
 		"""获取正在进行的订单
 		"""
 		pass
 
 	@classmethod
-	def get_all_transactions(cls,user:User)->List['Transaction']:
+	def get_all_transactions(cls,user:'User')->List['Transaction']:
 		"""获取所有订单
 		"""
 		pass
