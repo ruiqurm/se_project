@@ -1,8 +1,12 @@
 """
 配置
 """
-
+from cryptography.fernet import Fernet
 class Settings:
+	# 密钥
+	# SECRET_KEY = Fernet.generate_key()
+	SECRET_KEY = b"wWMA-DqJEVi5s9bztbxHHanYUKKrocb-2mei0jrLQ8I="
+	USER_LOGIN_TTL = 60 * 60 * 24  
 	# 快充基站数量
 	NUMBER_FC_STATION = 3
 	# 块冲基站充电速度

@@ -1,3 +1,4 @@
 pydantic
 tortoise-orm[asyncpg]
 pytest
+cryptography
