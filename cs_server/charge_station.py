@@ -12,7 +12,7 @@ from .settings import Settings
 
 class StationStatus:
     def __init__(self,
-                 _id: str,
+                 _id: int,
                  _type: int,
                  status: int,
                  charge_frequency: int,  # 系统启动后充电次数
@@ -46,7 +46,7 @@ class ChargeStation:
     下面的代码是为了方便IDE自动提示，实现时去掉
     """
 
-    def __init__(self, _id: str,  # 充电桩编号
+    def __init__(self, _id: int,  # 充电桩编号
                  _type: int,  # 充电桩类型
                  status: int,  #
                  charging_power: float,  # 充电功率 度/小时
@@ -143,23 +143,28 @@ class ChargeStation:
             cumulative_total_fee=self.cumulative_total_fee,
         )
 
-    def cancel_tran(self, tran: Transaction):
+    def __finish_tran(self, tran: Transaction):
         tran.finish()
-        self.cumulative_charging_duration += tran.charge_time.total_seconds()
-        self.cumulative_charging_times += 1
-        self.cumulative_charging_quantity += tran.quantity
-        self.cumulative_charging_fee += tran.charging_fee
-        self.cumulative_serviing_fee += tran.serving_fee
-        self.cumulative_total_fee += tran.charging_fee + tran.serving_fee
-        ChargeStationModel.update(
-            cumulative_charging_duration=self.cumulative_charging_duration,
-            cumulative_charging_times=self.cumulative_charging_times,
-            cumulative_charging_quantity=self.cumulative_charging_quantity,
-            cumulative_charging_fee=self.cumulative_charging_fee,
-            cumulative_serviing_fee=self.cumulative_serviing_fee,
-            cumulative_total_fee=self.cumulative_total_fee,
-        ).where(ChargeStationModel.id == self.id).execute()
+        try:
+            self.cumulative_charging_duration += tran.charge_time
+            self.cumulative_charging_times += 1
+            self.cumulative_charging_quantity += tran.quantity
+            self.cumulative_charging_fee += tran.charging_fee
+            self.cumulative_serviing_fee += tran.serving_fee
+            self.cumulative_total_fee += tran.charging_fee + tran.serving_fee
+
+            ChargeStationModel.update(
+                cumulative_charging_duration=self.cumulative_charging_duration,
+                cumulative_charging_times=self.cumulative_charging_times,
+                cumulative_charging_quantity=self.cumulative_charging_quantity,
+                cumulative_charging_fee=self.cumulative_charging_fee,
+                cumulative_serviing_fee=self.cumulative_serviing_fee,
+                cumulative_total_fee=self.cumulative_total_fee,
+            ).where(ChargeStationModel.id == self.id).execute()
+        except Exception as e:
+            print(e)
         self.now_tran = None
+        self.driver.signal_station_finish(station=self)
 
     def start(self, tran: Transaction) -> None:
         """开始充电
@@ -169,10 +174,8 @@ class ChargeStation:
             return
         self.now_tran = tran
         tran.start(station_id=self.id)
-        self.t = Timer((tran.end_time - tran.start_time).total_seconds(), self.cancel_tran, (self, tran))
+        self.t = Timer((tran.end_time - tran.start_time).total_seconds(), self.__finish_tran, (tran,))
         self.t.start()
-
-        self.driver.signal_station_finish(station=self)
 
     def cancel(self) -> None:
         """取消定时器
@@ -181,7 +184,9 @@ class ChargeStation:
         if self.now_tran is None:
             return
         self.t.cancel()
-        self.driver.cancel(tran=self.now_tran)
+        self.now_tran.finish()
+        self.now_tran = None
+        self.driver.signal_station_cancel(station=self)
 
     def report_error(self) -> None:
         """汇报一个错误
@@ -190,7 +195,9 @@ class ChargeStation:
         self.status = Settings.CHARGE_STATION_STATUS_ERR
         ChargeStationModel.update(status=self.status).where(ChargeStationModel.id == self.id).execute()
         if self.now_tran is not None:
-            self.cancel()
+            self.t.cancel()
+            self.now_tran.finish()
+            self.now_tran = None
         self.driver.signal_station_error(station=self)
 
 
@@ -199,7 +206,7 @@ class StationMgmt:
     """
 
     def __init__(self, stations: List[ChargeStation]) -> None:
-        self.stations = {}  # dict[str,ChargeStation]
+        self.stations = {}  # dict[int,ChargeStation]
         for s in stations:
             self.stations[s.id] = s
         self.f_id = 0
@@ -211,7 +218,19 @@ class StationMgmt:
             status_list.append(station.get_status())
         return status_list
 
-    def start(self, station_id: str, tran: Transaction) -> None:
+    def turn_on(self,station_id:int):
+        self.stations[station_id].turn_on()
+
+    def turn_off(self,station_id:int):
+        self.stations[station_id].turn_off()
+
+    def turn_error(self,station_id:int):
+        self.stations[station_id].report_error()
+
+    def cancel(self, station_id: int):
+        self.stations[station_id].cancel()
+
+    def start(self, station_id: int, tran: Transaction) -> None:
         """开始充电
 
         Args:
@@ -221,16 +240,3 @@ class StationMgmt:
         station = self.stations.get(station_id)
         station.start(tran=tran)
 
-    def get_number(self, mode: int) -> Optional[str]:
-        """取号
-        """
-        if mode == 0:
-            self.s_id += 1
-            num = "S" + str(self.s_id)
-            return num
-        self.f_id += 1
-        num = "F" + str(self.f_id)
-        return num
-
-    def cancel(self, station_id: str):
-        self.stations[station_id].cancel()

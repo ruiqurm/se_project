@@ -65,6 +65,7 @@ class UserModel(Model):
 class TransactionModel(Model):
     """订单
 	"""
+    wait_id = CharField(max_length=128) # 排队号
     user = ForeignKeyField(UserModel, backref='transations',null=True)
     mode = IntegerField()
     start_time = DateTimeField()
@@ -88,6 +89,7 @@ class BillModel(Model):
 	或者只保存一个time，然后做外键连接
 	"""
     time = DateTimeField(default=datetime.datetime.now)
+    wait_id = CharField(max_length=128)  # 排队号
     user = ForeignKeyField(UserModel, backref='bill')
     station_id = IntegerField()
     quantity = FloatField()

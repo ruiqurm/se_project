@@ -1,6 +1,9 @@
 """
 调度器
 """
+import datetime
+
+from typing import List
 
 from .settings import Settings
 from .transaction import Transaction
@@ -8,15 +11,15 @@ from .charge_station import ChargeStation
 import numpy as np
 
 class Scheduler:
-	def __init__(self):
-		self.areaMngt=AreaMgmt()
-	def on_finish(self,station:ChargeStation)->None:
+	def __init__(self, stations: List[int]):
+		self.areaMngt=AreaMgmt(stations)
+	def on_finish(self,station_id:int)->None:
 		"""完成充电
 
 		Args:
 			station (ChargeStation): 完成充电的充电桩
 		"""
-		station_id = station.ID
+		# 不用再调用tran.finish()了，前面会自动调用
 		#完成充电
 		self.areaMngt.finish(station_id)
 		#为充电桩调度
@@ -26,7 +29,7 @@ class Scheduler:
 		Transaction.start(station_id)
 		return 1
 
-	def on_error(self,station_id:str)->None:
+	def on_error(self,station_id:int)->None:
 		"""充电桩出现异常
 
 		Args:
@@ -44,12 +47,15 @@ class Scheduler:
 		AreaMgmt.lock_waitingArea()
 		#调度事件
 
-	def on_push(self,tran:Transaction):
+	def on_push(self,user_id,mode:int,quantity:float):
 		"""充电事务提交了
 
 		Args:
 			tran (Transaction): 提交的事务，内部有用户对象
 		"""
+		# 如果可以提交
+		# 用下面的代码
+		Transaction.new_transation(user_id,mode,datetime.datetime.now(),quantity)
 		raise
 		ret=AreaMgmt.push(userId,model,charging)
 		return ret
@@ -60,6 +66,7 @@ class Scheduler:
 			tran (Transaction): 充电事务
 			mode (int): 模式，这里暂定为int
 		"""
+		# 调用Transaction.update_mode()
 		raise
 		ret=AreaMgmt.update_mode(uid,mode)
 		pass
@@ -70,18 +77,20 @@ class Scheduler:
 			tran (Transaction): 充电事务
 			value (float): 充电量
 		"""
+		# 调用Transaction.update_quantity()
 		raise
 		# ret=AreaMgmt.update_quantity(uid,value)
 		pass
-	def on_cancel(self,tran:Transaction):
+	def on_cancel(self,station_id:int):
 		"""充电事务取消
 
 		Args:
 			tran (Transaction): 充电事务
 		"""
-		raise
+		# 不用再调用tran.cancel()了，这边改了一下，在传进来之前就被取消了。
+		pass
 
-	def on_station_on(self,station_id:str):
+	def on_station_on(self,station_id:int):
 		"""充电桩启动
 
 		Args:
@@ -89,7 +98,7 @@ class Scheduler:
 		"""
 		raise
 
-	def on_station_off(self,station_id:str):
+	def on_station_off(self,station_id:int):
 		"""充电桩关闭
 
 		Args:
@@ -99,7 +108,7 @@ class Scheduler:
 
 
 class AreaMgmt:
-	def __init__(self):
+	def __init__(self, charge_stations: List[int]):
 		self.each_queue_size=Settings.CHARGE_AREA_QUEUE_SIZE
 		self.waiting_area_size=Settings.WAITING_AREA_SIZE
 		self.fc_station_number=Settings.NUMBER_FC_STATION

@@ -9,7 +9,7 @@ from typing import TypeVar
 Scheduler = TypeVar('Scheduler')
 Transaction = TypeVar('Transaction')
 ChargeStation = TypeVar('ChargeStation')
-
+User = TypeVar('User')
 import threading
 class Driver:
 	def __init__(self,sche:Scheduler) -> None:
@@ -21,8 +21,11 @@ class Driver:
 	def update_quantity(self, tran:Transaction,value)->None:
 		self.scheduler.on_update_mode(tran,value)
 
-	def cancel(self,tran:Transaction)->None:
-		self.scheduler.on_cancel(tran)
+	def push(self,user:User,mode:int,quantity:float)->None:
+		self.scheduler.on_push(user.id,mode,quantity)
+
+	def signal_station_cancel(self,station:'ChargeStation')->None:
+		self.scheduler.on_cancel(station)
 
 	def signal_station_off(self,station:'ChargeStation')->None:
 		# asyncio.create_task(self.scheduler.on_station_off())

@@ -31,6 +31,7 @@ prices = [
 
 class Transaction:
     def __init__(self, _id: int,
+                 wait_id : str,
                  userid: int,  #
                  mode: int,  #
                  start_time: datetime,
@@ -45,6 +46,7 @@ class Transaction:
                  **kwargs: Any):
         super().__init__(**kwargs)
         self.id = _id
+        self.wait_id =wait_id
         self.userid = userid
         self.mode = mode
         self.tran_start_time = start_time
@@ -108,17 +110,14 @@ class Transaction:
         self.charge_time = self.end_time - self.start_time
         self.serving_fee = self.calculate_serving_fee()
         self.charging_fee = self.calculate_charging_fee()
-
-        #
-        bill = Bill.new_bill(
+        Bill.new_bill(
             user_id=self.userid,
             station_id=self.station_id,
             quantity=self.quantity,
             start_time=self.start_time, end_time=self.end_time,
             serving_fee=self.serving_fee, charging_fee=self.charging_fee,
             total_fee=self.serving_fee + self.charging_fee,
-            duration=timedelta(seconds=int(self.charge_time.total_seconds()))
-        )
+            duration=timedelta(seconds=int(self.charge_time.total_seconds())),wait_id=self.wait_id)
         self.status = settings.Settings.TRAN_STATUS_FINISH
         TransactionModel.update(charge_time=self.charge_time, charging_fee=self.charging_fee,
                                                    quantity=self.quantity,
@@ -161,7 +160,7 @@ class Transaction:
             return None
         found_dict = founds[0].__dict__["__data__"]
         return Transaction(_id=found_dict["id"], userid=found_dict["user"], mode=found_dict["mode"],
-                           start_time=found_dict["start_time"],
+                           start_time=found_dict["start_time"],wait_id=found_dict["wait_id"],
                            end_time=found_dict["end_time"], waiting_time=found_dict["waiting_time"],
                            quantity=found_dict["quantity"], station_id=found_dict["station_id"],
                            charge_time=found_dict["charge_time"], serving_fee=found_dict["serving_fee"],
@@ -177,7 +176,7 @@ class Transaction:
             found_dict = found.__dict__["__data__"]
             trans_list.append(
                 Transaction(_id=found_dict["id"], userid=found_dict["user"], mode=found_dict["mode"],
-                            start_time=found_dict["start_time"],
+                            start_time=found_dict["start_time"],wait_id=found_dict["wait_id"],
                             end_time=found_dict["end_time"], waiting_time=found_dict["waiting_time"],
                             quantity=found_dict["quantity"], station_id=found_dict["station_id"],
                             charge_time=found_dict["charge_time"], serving_fee=found_dict["serving_fee"],
@@ -187,13 +186,15 @@ class Transaction:
 
     @classmethod
     def new_transation(cls, userid: int, mode: int, start_time: datetime, quantity: float):
-        m = TransactionModel.create(user=userid, mode=mode, start_time=start_time, quantity=quantity, status=0)
-        return Transaction(_id=m.id, userid=userid, mode=mode, start_time=start_time, quantity=quantity, status=0)
+        wait_id = settings.get_number(mode)
+        m = TransactionModel.create(user=userid,wait_id=wait_id, mode=mode, start_time=start_time, quantity=quantity, status=0)
+        return Transaction(_id=m.id,wait_id=wait_id, userid=userid, mode=mode, start_time=start_time, quantity=quantity, status=0)
 
 
 class Bill:
     def __init__(self,
                  time: datetime,
+                 wait_id:str,
                  user_id: int,
                  station_id: int,
                  quantity: float,
@@ -205,6 +206,7 @@ class Bill:
                  total_fee: float,
                  _id: Optional[int] = None):
         self.user_id = user_id
+        self.wait_id = wait_id
         self.id = _id
         self.time = time
         self.station_id = station_id
@@ -220,7 +222,7 @@ class Bill:
         return BillModel.create(user=self.user_id, time=self.time, station_id=self.station_id, quantity=self.quantity,
                                 duration=self.duration, start_time=self.start_time, end_time=self.end_time,
                                 serving_fee=self.serving_fee, charging_fee=self.charging_fee,
-                                total_fee=self.total_fee
+                                total_fee=self.total_fee,wait_id = self.wait_id
                                 )
 
     @classmethod
@@ -234,14 +236,14 @@ class Bill:
                                   quantity=found_dict["quantity"], duration=found_dict["duration"],
                                   start_time=found_dict["start_time"], end_time=found_dict["end_time"],
                                   serving_fee=found_dict["serving_fee"], charging_fee=found_dict["charging_fee"],
-                                  total_fee=found_dict["total_fee"]))
+                                  total_fee=found_dict["total_fee"],wait_id = found_dict['wait_id']))
         return bill_list
 
     @classmethod
-    def new_bill(cls, user_id: int, station_id: int, quantity: float, start_time: datetime, end_time: datetime,
+    def new_bill(cls, user_id: int,wait_id:str, station_id: int, quantity: float, start_time: datetime, end_time: datetime,
                  serving_fee: float,
                  charging_fee: float, total_fee: float, duration: timedelta) -> 'Bill':
-        bill = Bill(user_id=user_id, time=datetime.now(), station_id=station_id,
+        bill = Bill(user_id=user_id,wait_id=wait_id, time=datetime.now(), station_id=station_id,
                     quantity=quantity,
                     start_time=start_time, end_time=end_time,
                     serving_fee=serving_fee, charging_fee=charging_fee,
