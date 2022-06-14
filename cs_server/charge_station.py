@@ -1,39 +1,25 @@
 """
 充电桩，充电桩管理
 """
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import List, Optional
 from threading import Timer
 from . import driver
 from .model import ChargeStationModel
 from .transaction import Transaction
-from cs_server.settings import Settings
+from .settings import Settings
 
 
 class StationStatus:
-    id: str
-    type: int
-    status: int  # 0: 开 1：关 2：错
-    charge_frequency: int  # 系统启动后充电次数
-    charge_duration: int  # 系统启动后充电时长,单位秒
-    charge_quantity: float  # 系统启动后充电量,单位瓦
-
-    cumulative_charging_times: int  # 累计充电次数
-    cumulative_charging_duration: int  # 累计充电时长,单位秒
-    cumulative_charging_quantity: float  # 累计充电量,单位瓦
-    cumulative_charging_fee: float  # 累计充电费用,单位元
-    cumulative_serviing_fee: float  # 累计服务费用,单位元
-    cumulative_total_fee: float  # 累计总费用,单位元
-
     def __init__(self,
                  _id: str,
                  _type: int,
                  status: int,
                  charge_frequency: int,  # 系统启动后充电次数
-                 charge_duration: int,  # 系统启动后充电时长,单位秒
+                 charge_duration: timedelta,  # 系统启动后充电时长,单位秒
                  charge_quantity: float,  # 系统启动后充电量,单位瓦
                  cumulative_charging_times: int,  # 累计充电次数
-                 cumulative_charging_duration: int,  # 累计充电时长,单位秒
+                 cumulative_charging_duration: timedelta,  # 累计充电时长,单位秒
                  cumulative_charging_quantity: float,  # 累计充电量,单位瓦
                  cumulative_charging_fee: float,  # 累计充电费用,单位元
                  cumulative_serviing_fee: float,  # 累计服务费用,单位元
@@ -56,16 +42,16 @@ class StationStatus:
 
 class ChargeStation:
     """充电桩基类
-	还需要实现model.py 里的ORM模型
-	下面的代码是为了方便IDE自动提示，实现时去掉
-	"""
+    还需要实现model.py 里的ORM模型
+    下面的代码是为了方便IDE自动提示，实现时去掉
+    """
 
     def __init__(self, _id: str,  # 充电桩编号
                  _type: int,  # 充电桩类型
                  status: int,  #
                  charging_power: float,  # 充电功率 度/小时
                  cumulative_charging_times: int,  # 累计充电次数
-                 cumulative_charging_duration: int,  # 累计充电时长,单位秒
+                 cumulative_charging_duration: timedelta,  # 累计充电时长,单位秒
                  cumulative_charging_quantity: float,  # 累计充电量,单位瓦
                  cumulative_charging_fee: float,  # 累计充电费用,单位元
                  cumulative_serviing_fee: float,  # 累计服务费用,单位元
@@ -86,9 +72,9 @@ class ChargeStation:
         self.t = None
         self.now_tran = None
 
-        self.initial_id = _id
-        self.initial_type = _type
-        self.initial_status = status
+        # self.initial_id = _id
+        # self.initial_type = _type
+        # self.initial_status = status
         self.initial_charging_power = charging_power
         self.initial_cumulative_charging_times = cumulative_charging_times
         self.initial_cumulative_charging_duration = cumulative_charging_duration
@@ -97,27 +83,51 @@ class ChargeStation:
         self.initial_cumulative_serviing_fee = cumulative_serviing_fee
         self.initial_cumulative_total_fee = cumulative_total_fee
 
+    @classmethod
+    def create_station(cls, type: int, driver: driver.Driver):
+        m = ChargeStationModel.create(type=type, status=Settings.CHARGE_STATION_STATUS_OFF,
+                                      charging_power=Settings.SC_STATION_SPEED if Settings.TRAN_CHARGE_MODE_SLOW
+                                      else Settings.FC_STATION_SPEED,
+                                      cumulative_charging_times=0,
+                                      cumulative_charging_duration=timedelta(seconds=0),
+                                      cumulative_charging_quantity=0,
+                                      cumulative_charging_fee=0,
+                                      cumulative_serviing_fee=0,
+                                      cumulative_total_fee=0
+                                      )
+        return cls(_id=m.id, _type=type, status=Settings.CHARGE_STATION_STATUS_OFF,
+                   charging_power=Settings.SC_STATION_SPEED
+                   if Settings.TRAN_CHARGE_MODE_SLOW else Settings.FC_STATION_SPEED,
+                   cumulative_charging_times=0,
+                   cumulative_charging_duration=timedelta(seconds=0),
+                   cumulative_charging_quantity=0,
+                   cumulative_charging_fee=0,
+                   cumulative_serviing_fee=0,
+                   cumulative_total_fee=0, _driver=driver)
+
     def turn_on(self):
         """开启充电桩
-		主要用于演示
-		调用driver.signal_station_on()
-		"""
-        ChargeStationModel.filter(id=self.id).update(**dict(status=Settings.CHARGE_STATION_STATUS_ON))
+        主要用于演示
+        调用driver.signal_station_on()
+        """
+        ChargeStationModel.update(status=Settings.CHARGE_STATION_STATUS_ON)\
+            .where(ChargeStationModel.id == self.id).execute()
         self.driver.signal_station_on(station=self)
 
     def turn_off(self):
         """关闭充电桩
-		主要用于演示
-		调用driver.signal_station_off()
-		"""
+        主要用于演示
+        调用driver.signal_station_off()
+        """
         if self.now_tran is not None:
             self.cancel()
-        ChargeStationModel.filter(id=self.id).update(**dict(status=Settings.CHARGE_STATION_STATUS_OFF))
+        ChargeStationModel.update(status=Settings.CHARGE_STATION_STATUS_OFF) \
+            .where(ChargeStationModel.id == self.id).execute()
         self.driver.signal_station_off(station=self)
 
     def get_status(self) -> StationStatus:
         """获取充电桩状态(见作业要求)
-		"""
+        """
         return StationStatus(
             _id=self.id,
             _type=self.type,
@@ -141,20 +151,20 @@ class ChargeStation:
         self.cumulative_charging_fee += tran.charging_fee
         self.cumulative_serviing_fee += tran.serving_fee
         self.cumulative_total_fee += tran.charging_fee + tran.serving_fee
-        ChargeStationModel.filter(id=self.id).update(**dict(
+        ChargeStationModel.update(
             cumulative_charging_duration=self.cumulative_charging_duration,
             cumulative_charging_times=self.cumulative_charging_times,
             cumulative_charging_quantity=self.cumulative_charging_quantity,
             cumulative_charging_fee=self.cumulative_charging_fee,
             cumulative_serviing_fee=self.cumulative_serviing_fee,
             cumulative_total_fee=self.cumulative_total_fee,
-        ))
+        ).where(ChargeStationModel.id == self.id).execute()
         self.now_tran = None
 
     def start(self, tran: Transaction) -> None:
         """开始充电
-		启动定时器，n秒后，调用driver.signal_station_finish()
-		"""
+        启动定时器，n秒后，调用driver.signal_station_finish()
+        """
         if self.now_tran is not None:
             return
         self.now_tran = tran
@@ -166,8 +176,8 @@ class ChargeStation:
 
     def cancel(self) -> None:
         """取消定时器
-		用于取消充电事务时
-		"""
+        用于取消充电事务时
+        """
         if self.now_tran is None:
             return
         self.t.cancel()
@@ -175,10 +185,10 @@ class ChargeStation:
 
     def report_error(self) -> None:
         """汇报一个错误
-		主要用于演示.调用driver.signal_station_error()
-		"""
+        主要用于演示.调用driver.signal_station_error()
+        """
         self.status = Settings.CHARGE_STATION_STATUS_ERR
-        await ChargeStationModel.filter(id=self.id).update(**dict(status=self.status))
+        ChargeStationModel.update(status=self.status).where(ChargeStationModel.id == self.id).execute()
         if self.now_tran is not None:
             self.cancel()
         self.driver.signal_station_error(station=self)
@@ -186,7 +196,7 @@ class ChargeStation:
 
 class StationMgmt:
     """充电桩管理
-	"""
+    """
 
     def __init__(self, stations: List[ChargeStation]) -> None:
         self.stations = {}  # dict[str,ChargeStation]
@@ -204,16 +214,16 @@ class StationMgmt:
     def start(self, station_id: str, tran: Transaction) -> None:
         """开始充电
 
-		Args:
-			station_id (str): 充电桩ID
-			tran (Transaction): 充电订单
-		"""
+        Args:
+            station_id (str): 充电桩ID
+            tran (Transaction): 充电订单
+        """
         station = self.stations.get(station_id)
         station.start(tran=tran)
 
     def get_number(self, mode: int) -> Optional[str]:
         """取号
-		"""
+        """
         if mode == 0:
             self.s_id += 1
             num = "S" + str(self.s_id)

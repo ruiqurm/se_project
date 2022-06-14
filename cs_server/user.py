@@ -7,21 +7,21 @@ from .transaction import Bill, Transaction
 import time
 from cryptography.fernet import Fernet
 from .settings import Settings
-
+from syncer import sync
 
 def encode(obj: str) -> str:
     f = Fernet(Settings.SECRET_KEY)
-    return f.encrypt_at_time(obj, time.time())
+    return f.encrypt_at_time(obj.encode(), int(time.time())).decode()
 
 
-def decode(token: str) -> str:
+def decode(token: str) -> Optional[str]:
     f = Fernet(Settings.SECRET_KEY)
     try:
-        obj = f.decrypt_at_time(token, Settings.USER_LOGIN_TTL, time.time())
+        obj = f.decrypt_at_time(token.encode(), Settings.USER_LOGIN_TTL, int(time.time()))
     except Exception:
         return None
     else:
-        return obj
+        return obj.decode()
 
 
 class User:
@@ -44,22 +44,22 @@ class User:
 
     @classmethod
     def register(cls, username: str, password: str) -> Optional['User']:
-        founds = await UserModel.filter(username=username).all()
+        founds = list(UserModel.select().where(UserModel.username==username))
         if len(founds) > 0:
             return None
-        new_id = cls.increment_id
-        await UserModel.create(id=new_id, username=username, password=password)
-        cls.increment_id += 1
-        return User(_id=new_id, username=username, password=password)
+        # new_id = cls.increment_id
+        m = UserModel.create(username=username, password=password)
+        # cls.increment_id += 1
+        return User(_id=m.id, username=username, password=password)
 
     @classmethod
     def login(cls, username: str, password: str) -> Optional[str]:
-        founds = await UserModel.filter(username=username).all()
+        founds = list(UserModel.select().where(UserModel.username==username))
         if len(founds) < 1:
             return None
-        if founds[0].__dict__["password"] != password:
+        if  founds[0].password != password:
             return None
-        return encode(str(founds[0].__dict__["id"]))
+        return encode(str(founds[0].id))
 
     @classmethod
     def get_user(cls, token: str) -> Optional['User']:
@@ -71,8 +71,9 @@ class User:
 
     @classmethod
     def get_user_by_id(cls, _id: int):
-        founds = await UserModel.filter(id=_id).all()
-        if len(founds) < 1:
+        try:
+            user = UserModel.get_by_id(_id)
+        except Exception:
             return None
-        found_dict = founds[0].__dict__
+        found_dict = user.__dict__['__data__']
         return User(_id=found_dict["id"], username=found_dict["username"], password=found_dict["password"])

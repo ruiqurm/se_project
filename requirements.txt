@@ -1,4 +1,5 @@
 pydantic
-tortoise-orm[asyncpg]
+peewee
 pytest
 cryptography
+pytest-asyncio
