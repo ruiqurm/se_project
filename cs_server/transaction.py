@@ -2,7 +2,7 @@
 包括transaction,Bill类
 """
 from typing import List, Optional, Any
-from . import settings
+from .settings import Settings,now,get_number
 from .model import TransactionModel, BillModel
 from datetime import datetime, timedelta
 
@@ -19,13 +19,13 @@ def inc(num: int) -> int:
 
 periods = [7, 3, 5, 3, 3, 2, 1]
 prices = [
-    settings.Settings.VALLEY_TIME_CHARGE_UNIT_PRICE,
-    settings.Settings.COMMON_TIME_CHARGE_UNIT_PRICE,
-    settings.Settings.PEEK_TIME_CHARGE_UNIT_PRICE,
-    settings.Settings.COMMON_TIME_CHARGE_UNIT_PRICE,
-    settings.Settings.PEEK_TIME_CHARGE_UNIT_PRICE,
-    settings.Settings.COMMON_TIME_CHARGE_UNIT_PRICE,
-    settings.Settings.VALLEY_TIME_CHARGE_UNIT_PRICE
+    Settings.VALLEY_TIME_CHARGE_UNIT_PRICE,
+    Settings.COMMON_TIME_CHARGE_UNIT_PRICE,
+    Settings.PEEK_TIME_CHARGE_UNIT_PRICE,
+    Settings.COMMON_TIME_CHARGE_UNIT_PRICE,
+    Settings.PEEK_TIME_CHARGE_UNIT_PRICE,
+    Settings.COMMON_TIME_CHARGE_UNIT_PRICE,
+    Settings.VALLEY_TIME_CHARGE_UNIT_PRICE
 ]
 
 
@@ -58,12 +58,12 @@ class Transaction:
         self.charging_fee = charging_fee
         self.station_id = station_id
         self.status = status
-        self.start_time = datetime.now()
-        self.speed = settings.Settings.SC_STATION_SPEED
+        self.start_time = now()
+        self.speed = Settings.SC_STATION_SPEED
         self.cancelFlag = False
 
     def calculate_serving_fee(self) -> float:
-        return self.quantity * settings.Settings.SERVICE_UNIT_PRICE
+        return self.quantity * Settings.SERVICE_UNIT_PRICE
 
     def calculate_charging_fee(self) -> float:
         fee = 0.0
@@ -101,7 +101,7 @@ class Transaction:
             return
         self.cancelFlag = True
 
-        end_time = datetime.now()
+        end_time = now()
         if less(end_time, self.end_time):
             self.end_time = end_time
             # 秒 * 度/时
@@ -118,7 +118,7 @@ class Transaction:
             serving_fee=self.serving_fee, charging_fee=self.charging_fee,
             total_fee=self.serving_fee + self.charging_fee,
             duration=timedelta(seconds=int(self.charge_time.total_seconds())),wait_id=self.wait_id)
-        self.status = settings.Settings.TRAN_STATUS_FINISH
+        self.status = Settings.TRAN_STATUS_FINISH
         TransactionModel.update(charge_time=self.charge_time, charging_fee=self.charging_fee,
                                                    quantity=self.quantity,
                                                    serving_fee=self.serving_fee, status=self.status,
@@ -128,10 +128,10 @@ class Transaction:
         """更新充电模式
         """
         self.mode = mode
-        if self.mode == settings.Settings.TRAN_CHARGE_MODE_SLOW:
-            self.speed = settings.Settings.SC_STATION_SPEED
+        if self.mode == Settings.TRAN_CHARGE_MODE_SLOW:
+            self.speed = Settings.SC_STATION_SPEED
         else:
-            self.speed = settings.Settings.FC_STATION_SPEED
+            self.speed = Settings.FC_STATION_SPEED
         TransactionModel.update(mode=mode).where(TransactionModel.id == self.id).execute()
 
     def update_quantity(self, quantity: float) -> None:
@@ -144,7 +144,7 @@ class Transaction:
         """开始充电
         """
         self.station_id = station_id
-        self.start_time = datetime.now()
+        self.start_time = now()
         self.calculate_end_time()
         self.waiting_time = self.start_time - self.tran_start_time
         TransactionModel.update(station_id=station_id, waiting_time=self.waiting_time,
@@ -186,7 +186,7 @@ class Transaction:
 
     @classmethod
     def new_transation(cls, userid: int, mode: int, start_time: datetime, quantity: float):
-        wait_id = settings.get_number(mode)
+        wait_id = get_number(mode)
         m = TransactionModel.create(user=userid,wait_id=wait_id, mode=mode, start_time=start_time, quantity=quantity, status=0)
         return Transaction(_id=m.id,wait_id=wait_id, userid=userid, mode=mode, start_time=start_time, quantity=quantity, status=0)
 
@@ -243,7 +243,7 @@ class Bill:
     def new_bill(cls, user_id: int,wait_id:str, station_id: int, quantity: float, start_time: datetime, end_time: datetime,
                  serving_fee: float,
                  charging_fee: float, total_fee: float, duration: timedelta) -> 'Bill':
-        bill = Bill(user_id=user_id,wait_id=wait_id, time=datetime.now(), station_id=station_id,
+        bill = Bill(user_id=user_id,wait_id=wait_id, time=now(), station_id=station_id,
                     quantity=quantity,
                     start_time=start_time, end_time=end_time,
                     serving_fee=serving_fee, charging_fee=charging_fee,

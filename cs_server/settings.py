@@ -1,6 +1,7 @@
 """
 配置
 """
+import datetime
 from typing import Optional
 
 from cryptography.fernet import Fernet
@@ -46,6 +47,11 @@ class Settings:
 
     PERSIST_ID = False
 
+    MOCK_DATETIME = True
+    START_TIME = datetime.time(hour=6, minute=30, second=0)
+    TIME_FLOW_RATE = 5
+
+
 s_id = 1
 f_id = 1
 if Settings.PERSIST_ID:
@@ -57,20 +63,39 @@ if Settings.PERSIST_ID:
 
 
 def get_number(mode: int):
-	global s_id,f_id
-	if mode == 0:
-		num = "S" + str(s_id)
-		s_id += 1
-		if Settings.PERSIST_ID:
-			import pickle
-			pickle.dump((s_id,f_id),open("id_persist.pkl", "wb"))
-		return num
-	elif mode == 1:
-		num = "F" + str(f_id)
-		f_id += 1
-		if Settings.PERSIST_ID:
-			import pickle
-			pickle.dump((s_id,f_id),open("id_persist.pkl", "wb"))
-		return num
-	else:
-		raise
+    global s_id, f_id
+    if mode == 0:
+        num = "S" + str(s_id)
+        s_id += 1
+        if Settings.PERSIST_ID:
+            import pickle
+            pickle.dump((s_id, f_id), open("id_persist.pkl", "wb"))
+        return num
+    elif mode == 1:
+        num = "F" + str(f_id)
+        f_id += 1
+        if Settings.PERSIST_ID:
+            import pickle
+            pickle.dump((s_id, f_id), open("id_persist.pkl", "wb"))
+        return num
+    else:
+        raise
+
+
+_ = datetime.date.today()
+START_DATETIME = datetime.datetime.now()
+BASE_DATETIME = datetime.datetime(year=_.year, month=_.month, day=_.day, hour=Settings.START_TIME.hour,
+                                   minute=Settings.START_TIME.minute, second=Settings.START_TIME.second)
+
+def now():
+    if Settings.MOCK_DATETIME:
+        elapse_time = (datetime.datetime.now() - START_DATETIME)
+        return BASE_DATETIME + elapse_time * Settings.TIME_FLOW_RATE
+    else:
+        return datetime.datetime.now()
+
+def real_time(t1:datetime,t2:datetime)->datetime.timedelta:
+    if Settings.MOCK_DATETIME:
+        return (t1 - t2) / Settings.TIME_FLOW_RATE
+    else:
+        return t1 - t2

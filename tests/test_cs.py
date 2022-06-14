@@ -69,6 +69,7 @@ def test_chargeStation(clear_db):
 	import datetime
 	driver = DumbDriver()
 	Settings.SC_STATION_SPEED = 2*3600 # 1s充完
+	Settings.MOCK_DATETIME = False
 	cs = ChargeStation.create_station(0,driver)
 	assert cs.status == Settings.CHARGE_STATION_STATUS_OFF
 	cs.turn_on()

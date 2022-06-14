@@ -7,7 +7,7 @@ from threading import Timer
 from . import driver
 from .model import ChargeStationModel
 from .transaction import Transaction
-from .settings import Settings
+from .settings import Settings,now,real_time
 
 
 class StationStatus:
@@ -25,7 +25,7 @@ class StationStatus:
                  cumulative_serviing_fee: float,  # 累计服务费用,单位元
                  cumulative_total_fee: float,  # 累计总费用,单位元
                  ):
-        self.time = datetime.now()
+        self.time = now()
         self.id = _id
         self.type = _type
         self.status = status
@@ -145,24 +145,21 @@ class ChargeStation:
 
     def __finish_tran(self, tran: Transaction):
         tran.finish()
-        try:
-            self.cumulative_charging_duration += tran.charge_time
-            self.cumulative_charging_times += 1
-            self.cumulative_charging_quantity += tran.quantity
-            self.cumulative_charging_fee += tran.charging_fee
-            self.cumulative_serviing_fee += tran.serving_fee
-            self.cumulative_total_fee += tran.charging_fee + tran.serving_fee
+        self.cumulative_charging_duration += tran.charge_time
+        self.cumulative_charging_times += 1
+        self.cumulative_charging_quantity += tran.quantity
+        self.cumulative_charging_fee += tran.charging_fee
+        self.cumulative_serviing_fee += tran.serving_fee
+        self.cumulative_total_fee += tran.charging_fee + tran.serving_fee
 
-            ChargeStationModel.update(
-                cumulative_charging_duration=self.cumulative_charging_duration,
-                cumulative_charging_times=self.cumulative_charging_times,
-                cumulative_charging_quantity=self.cumulative_charging_quantity,
-                cumulative_charging_fee=self.cumulative_charging_fee,
-                cumulative_serviing_fee=self.cumulative_serviing_fee,
-                cumulative_total_fee=self.cumulative_total_fee,
-            ).where(ChargeStationModel.id == self.id).execute()
-        except Exception as e:
-            print(e)
+        ChargeStationModel.update(
+            cumulative_charging_duration=self.cumulative_charging_duration,
+            cumulative_charging_times=self.cumulative_charging_times,
+            cumulative_charging_quantity=self.cumulative_charging_quantity,
+            cumulative_charging_fee=self.cumulative_charging_fee,
+            cumulative_serviing_fee=self.cumulative_serviing_fee,
+            cumulative_total_fee=self.cumulative_total_fee,
+        ).where(ChargeStationModel.id == self.id).execute()
         self.now_tran = None
         self.driver.signal_station_finish(station=self)
 
@@ -174,7 +171,7 @@ class ChargeStation:
             return
         self.now_tran = tran
         tran.start(station_id=self.id)
-        self.t = Timer((tran.end_time - tran.start_time).total_seconds(), self.__finish_tran, (tran,))
+        self.t = Timer(real_time(tran.end_time,tran.start_time).total_seconds(), self.__finish_tran, (tran,))
         self.t.start()
 
     def cancel(self) -> None:
