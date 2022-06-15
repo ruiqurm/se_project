@@ -11,8 +11,8 @@ from .charge_station import ChargeStation
 import numpy as np
 
 class Scheduler:
-	def __init__(self, stations: List[int]):
-		self.areaMngt=AreaMgmt(stations)
+	def __init__(self, slow_stations: List[int],fast_stations:List[int]):
+		self.areaMngt=AreaMgmt(slow_stations,fast_stations)
 	def on_finish(self,station_id:int)->None:
 		"""完成充电
 
@@ -108,7 +108,10 @@ class Scheduler:
 
 
 class AreaMgmt:
-	def __init__(self, charge_stations: List[int]):
+	def __init__(self, slow_stations: List[int],fast_stations:List[int]):
+		# slow_stations 慢充电桩id列表
+		# fast_stations 快充电桩id列表
+		raise
 		self.each_queue_size=Settings.CHARGE_AREA_QUEUE_SIZE
 		self.waiting_area_size=Settings.WAITING_AREA_SIZE
 		self.fc_station_number=Settings.NUMBER_FC_STATION
