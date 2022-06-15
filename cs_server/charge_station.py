@@ -181,7 +181,7 @@ class ChargeStation:
         if self.now_tran is None:
             return
         self.t.cancel()
-        self.now_tran.finish()
+        self.now_tran.finish(cancel=True)
         self.now_tran = None
         self.driver.signal_station_cancel(station=self)
 

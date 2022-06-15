@@ -94,7 +94,7 @@ class Transaction:
         time = timedelta(seconds=t)
         self.end_time = self.start_time + time
 
-    def finish(self) -> None:
+    def finish(self,cancel=False) -> None:
         """取消充电
         """
         if self.cancelFlag:
@@ -102,7 +102,7 @@ class Transaction:
         self.cancelFlag = True
 
         end_time = now()
-        if less(end_time, self.end_time):
+        if cancel:
             self.end_time = end_time
             # 秒 * 度/时
             self.quantity = (self.end_time - self.start_time).total_seconds() * (self.speed / 3600.0)

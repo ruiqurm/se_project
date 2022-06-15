@@ -9,10 +9,10 @@ def test_time():
     t1 = now()
     time.sleep(0.5)
     t2 = now()
-    assert (t2 - t1).total_seconds() > 0.5
+    assert (t2 - t1).total_seconds() >= 0.5
     assert (t2 - t1).total_seconds() < 0.75
 
-    assert real_time(t2,t1).total_seconds() > 0.5
+    assert real_time(t2,t1).total_seconds() >= 0.5
     assert real_time(t2,t1).total_seconds() < 0.75
 
     Settings.MOCK_DATETIME = True
@@ -20,12 +20,12 @@ def test_time():
     t1 = now()
     time.sleep(0.5)
     t2 = now() # should be +2.5
-    assert (t2 - t1).total_seconds() > 2.5
+    assert (t2 - t1).total_seconds() >= 2.5
     assert (t2 - t1).total_seconds() < 2.6
     assert t2.hour == Settings.START_TIME.hour
     assert t2.minute == Settings.START_TIME.minute
 
-    assert real_time(t2,t1).total_seconds() > 0.5
+    assert real_time(t2,t1).total_seconds() >= 0.5
     assert real_time(t2,t1).total_seconds() < 0.6
 
     # higher rate
@@ -33,12 +33,12 @@ def test_time():
     t1 = now()
     time.sleep(0.5)
     t2 = now()  # should be +2.5
-    assert (t2 - t1).total_seconds() > 15
+    assert (t2 - t1).total_seconds() >= 15
     assert (t2 - t1).total_seconds() < 16
     assert t2.hour == Settings.START_TIME.hour
     assert t2.minute == Settings.START_TIME.minute
 
-    assert real_time(t2, t1).total_seconds() > 0.5
+    assert real_time(t2, t1).total_seconds() >= 0.5
     assert real_time(t2, t1).total_seconds() < 0.6
 
 
@@ -49,10 +49,23 @@ def test_higher():
         t1 = now()
         time.sleep(0.5)
         t2 = now()  # should be +2.5
-        assert (t2 - t1).total_seconds() > 30
+        assert (t2 - t1).total_seconds() >= 30
         assert (t2 - t1).total_seconds() < 31
 
-        assert real_time(t2, t1).total_seconds() > 0.5
+        assert real_time(t2, t1).total_seconds() >= 0.5
         assert real_time(t2, t1).total_seconds() < 0.6
 
+def test_higher2():
+    Settings.MOCK_DATETIME = True
+    Settings.TIME_FLOW_RATE = 150
+    for i in range(20):
+        t1 = now()
+        time.sleep(0.5)
+        t2 = now()  # should be +2.5
+
+        assert (t2 - t1).total_seconds() >= 75
+        assert (t2 - t1).total_seconds() < 80
+
+        assert real_time(t2, t1).total_seconds() >= 0.5
+        assert real_time(t2, t1).total_seconds() < 0.6
 
