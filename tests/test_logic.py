@@ -21,7 +21,7 @@ def clear_db():
     BillModel.delete().execute()
 
 
-def setup() -> Tuple[Driver, Scheduler, StationMgmt, List[User]]:
+def setup() -> Tuple[Driver, Scheduler, StationMgmt]:
     d = Driver(None)
     stations = [
         ChargeStation.create_station(0, d),
@@ -35,19 +35,19 @@ def setup() -> Tuple[Driver, Scheduler, StationMgmt, List[User]]:
     sm = StationMgmt(stations)
     sch = Scheduler(sm)
     d.scheduler = sch
-    users = [User.register(f"user{i}", f"user{i}") for i in range(1,31)]
-    return (d, sch, sm, users)
+    return d, sch, sm
 
 
-def virtual_time_to_real_interval(t: datetime.datetime) -> datetime.timedelta:
+def virtual_time_to_real_interval(t2: datetime.datetime,t1:datetime.datetime) -> float:
     # 计算真实睡眠时间
-    return (t - settings.BASE_DATETIME) / Settings.TIME_FLOW_RATE
+    return ((t2 - t1) / Settings.TIME_FLOW_RATE).total_seconds()
 
 
-class Command():
+class Command:
     unuse_user = []
-    vid_to_user:Dict[int,User] = {}
-    def __init__(self,triger_time:datetime.time,v1,v2,v3,v4):
+    vid_to_user: Dict[int, User] = {}
+    base = settings.TODAY_DATETIME
+    def __init__(self, triger_time: datetime.time, v1, v2, v3, v4):
         self.triger_time = triger_time
         self.type = v1
         if v1 == "A":
@@ -98,10 +98,10 @@ class Command():
             else:
                 self.quantity = float(v4)
 
-    def execute(self,driver:Driver,station_mgmt:StationMgmt):
+    def execute(self, driver: Driver, station_mgmt: StationMgmt):
         if self.type == 'A':
             if self.quantity is not None:
-                driver.push(self.user,self.mode,self.quantity)
+                driver.push(self.user, self.mode, self.quantity)
             else:
                 t = self.user.get_running_transaction()
                 driver.signal_station_cancel(t)
@@ -109,15 +109,18 @@ class Command():
             if self.station_mode == True:
                 station_mgmt.turn_on(self.station_id)
             else:
-                station_mgmt.turn_error(self.station_id)
+                station_mgmt.turn_off(self.station_id)
         elif self.type == 'C':
             t = self.user.get_running_transaction()
             if self.quantity is not None:
-                driver.update_quantity(t,self.quantity)
+                driver.update_quantity(t, self.quantity)
             if self.mode is not None:
-                driver.update_mode(t,self.mode)
-    def time(self,base:datetime.datetime)->datetime.datetime:
-        return base+datetime.timedelta(hours=self.triger_time.hour,minutes=self.triger_time.minute,seconds=self.triger_time.second)
+                driver.update_mode(t, self.mode)
+
+    def time(self) -> datetime.datetime:
+        return self.base + datetime.timedelta(hours=self.triger_time.hour, minutes=self.triger_time.minute,
+                                         seconds=self.triger_time.second)
+
     def __str__(self):
         if self.type == 'A':
             if self.quantity is None:
@@ -150,53 +153,65 @@ class Command():
             elif self.mode > 0:
                 return f"[{self.triger_time.strftime('%H:%M:%S')}]修改 {self.vid} 模式={mode}"
 
+
 def test_chargeStation(clear_db):
-    driver, scheduler, station_mgmt, users = setup()
+    driver, scheduler, station_mgmt = setup()
+    users = [User.register(f"user{i}", f"user{i}") for i in range(1, 31)]
     Command.unuse_user = users
     print()
-    commands = [Command(datetime.time(6, 0),'A','V1','T',40),
-                Command(datetime.time(6, 5),'A','V2','T',30),
-                Command(datetime.time(6, 10),'A','V3','F',100),
-                Command(datetime.time(6, 15),'A','V4','F',120),
-                Command(datetime.time(6, 20),'A','V2','O',0),
-                Command(datetime.time(6, 25),'A','V5','T',20),
-                Command(datetime.time(6, 30),'A','V6','T',20),
-                Command(datetime.time(6, 35),'A','V7','F',110),
-                Command(datetime.time(6, 40),'A','V8','T',20),
-                Command(datetime.time(6, 45),'A','V9','F',105),
-                Command(datetime.time(6, 50),'A','V10','T',10),
-                Command(datetime.time(6, 55),'A','V11','F',110),
-                Command(datetime.time(7, 0),'A','V12','F',90),
-                Command(datetime.time(7, 5),'A','V13','F',110),
-                Command(datetime.time(7, 10),'A','V14','F',95),
-                Command(datetime.time(7, 15),'A','V15','T',10),
-                Command(datetime.time(7, 20),'A','V16','F',60),
-                Command(datetime.time(7, 25),'A','V17','T',10),
-                Command(datetime.time(7, 30),'A','V18','T',7.5),
-                Command(datetime.time(7, 35),'A','V19','F',75),
-                Command(datetime.time(7, 40),'A','V20','F',95),
-                Command(datetime.time(7, 45),'A','V21','F',95),
-                Command(datetime.time(7, 50),'A','V22','F',70),
-                Command(datetime.time(7, 55),'A','V23','F',80),
-                Command(datetime.time(8, 0),'A','V24','T',5),
-                Command(datetime.time(8, 20),'A','V25','T',15),
-                Command(datetime.time(8, 25),'B','T1','O',0),
-                Command(datetime.time(8, 30),'A','V26','T',20),
-                Command(datetime.time(8, 35),'A','V27','T',25),
-                Command(datetime.time(8, 50),'B','F1','O',0),
-                Command(datetime.time(9, 0),'A','V28','F',30),
-                Command(datetime.time(9, 10),'A','V1','O',0),
-                Command(datetime.time(9, 15),'B','T1','O',1),
-                Command(datetime.time(9, 20),'A','V27','O',0),
-                Command(datetime.time(9, 25),'C','V21','F',35),
-                Command(datetime.time(9, 30),'A','V19','O',0),
-                Command(datetime.time(9, 35),'A','V28','O',0),
-                Command(datetime.time(9, 40),'C','V23','F',40),
-                Command(datetime.time(9, 50),'A','V29','T',30),
-                Command(datetime.time(9, 55),'C','V14','F',30),
-                Command(datetime.time(10, 0),'A','V30','T',10),
-                Command(datetime.time(10, 50),'B','F1','O',1)
+    commands = [Command(datetime.time(6, 0), 'A', 'V1', 'T', 40),
+                Command(datetime.time(6, 5), 'A', 'V2', 'T', 30),
+                Command(datetime.time(6, 10), 'A', 'V3', 'F', 100),
+                Command(datetime.time(6, 15), 'A', 'V4', 'F', 120),
+                Command(datetime.time(6, 20), 'A', 'V2', 'O', 0),
+                Command(datetime.time(6, 25), 'A', 'V5', 'T', 20),
+                Command(datetime.time(6, 30), 'A', 'V6', 'T', 20),
+                Command(datetime.time(6, 35), 'A', 'V7', 'F', 110),
+                Command(datetime.time(6, 40), 'A', 'V8', 'T', 20),
+                Command(datetime.time(6, 45), 'A', 'V9', 'F', 105),
+                Command(datetime.time(6, 50), 'A', 'V10', 'T', 10),
+                Command(datetime.time(6, 55), 'A', 'V11', 'F', 110),
+                Command(datetime.time(7, 0), 'A', 'V12', 'F', 90),
+                Command(datetime.time(7, 5), 'A', 'V13', 'F', 110),
+                Command(datetime.time(7, 10), 'A', 'V14', 'F', 95),
+                Command(datetime.time(7, 15), 'A', 'V15', 'T', 10),
+                Command(datetime.time(7, 20), 'A', 'V16', 'F', 60),
+                Command(datetime.time(7, 25), 'A', 'V17', 'T', 10),
+                Command(datetime.time(7, 30), 'A', 'V18', 'T', 7.5),
+                Command(datetime.time(7, 35), 'A', 'V19', 'F', 75),
+                Command(datetime.time(7, 40), 'A', 'V20', 'F', 95),
+                Command(datetime.time(7, 45), 'A', 'V21', 'F', 95),
+                Command(datetime.time(7, 50), 'A', 'V22', 'F', 70),
+                Command(datetime.time(7, 55), 'A', 'V23', 'F', 80),
+                Command(datetime.time(8, 0), 'A', 'V24', 'T', 5),
+                Command(datetime.time(8, 20), 'A', 'V25', 'T', 15),
+                Command(datetime.time(8, 25), 'B', 'T1', 'O', 0),
+                Command(datetime.time(8, 30), 'A', 'V26', 'T', 20),
+                Command(datetime.time(8, 35), 'A', 'V27', 'T', 25),
+                Command(datetime.time(8, 50), 'B', 'F1', 'O', 0),
+                Command(datetime.time(9, 0), 'A', 'V28', 'F', 30),
+                Command(datetime.time(9, 10), 'A', 'V1', 'O', 0),
+                Command(datetime.time(9, 15), 'B', 'T1', 'O', 1),
+                Command(datetime.time(9, 20), 'A', 'V27', 'O', 0),
+                Command(datetime.time(9, 25), 'C', 'V21', 'F', 35),
+                Command(datetime.time(9, 30), 'A', 'V19', 'O', 0),
+                Command(datetime.time(9, 35), 'A', 'V28', 'O', 0),
+                Command(datetime.time(9, 40), 'C', 'V23', 'F', 40),
+                Command(datetime.time(9, 50), 'A', 'V29', 'T', 30),
+                Command(datetime.time(9, 55), 'C', 'V14', 'F', 30),
+                Command(datetime.time(10, 0), 'A', 'V30', 'T', 10),
+                Command(datetime.time(10, 50), 'B', 'F1', 'O', 1)
                 ]
     settings.START_DATETIME = datetime.datetime.now()
+    _ = datetime.datetime.today()
+    datetime.datetime(year=_.year, month=_.month, day=_.day, hour=Settings.START_TIME.hour,
+                      minute=Settings.START_TIME.minute, second=Settings.START_TIME.second)
     for i in commands:
         print(i)
+    # 测试
+    # for i,command in enumerate(commands):
+    #     if i != 0:
+    #         last = commands[i-1]
+    #         sleep_time = virtual_time_to_real_interval(command.time(),last.time())
+    #         time.sleep(sleep_time)
+    #     command.execute(driver,station_mgmt)

@@ -184,15 +184,15 @@ class ChargeStation:
         self.now_tran.finish(cancel=True)
         self.now_tran = None
 
-    def report_error(self) -> None:
-        """汇报一个错误
-        主要用于演示.调用driver.signal_station_error()
-        """
-        self.status = Settings.CHARGE_STATION_STATUS_ERR
-        ChargeStationModel.update(status=self.status).where(ChargeStationModel.id == self.id).execute()
-        if self.now_tran is not None:
-            self.cancel()
-        self.driver.signal_station_error(station=self)
+    # def report_error(self) -> None:
+    #     """汇报一个错误
+    #     主要用于演示.调用driver.signal_station_error()
+    #     """
+    #     self.status = Settings.CHARGE_STATION_STATUS_ERR
+    #     ChargeStationModel.update(status=self.status).where(ChargeStationModel.id == self.id).execute()
+    #     if self.now_tran is not None:
+    #         self.cancel()
+    #     self.driver.signal_station_error(station=self)
 
 
 class StationMgmt:
@@ -229,8 +229,8 @@ class StationMgmt:
     def turn_off(self,station_id:int):
         self.stations[station_id].turn_off()
 
-    def turn_error(self,station_id:int):
-        self.stations[station_id].report_error()
+    # def turn_error(self,station_id:int):
+    #     self.stations[station_id].report_error()
 
     def cancel(self, station_id: int):
         self.stations[station_id].cancel()

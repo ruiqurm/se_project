@@ -83,6 +83,7 @@ def get_number(mode: int):
 
 
 _ = datetime.date.today()
+TODAY_DATETIME = datetime.datetime(year=_.year, month=_.month, day=_.day)
 START_DATETIME = datetime.datetime.now()
 BASE_DATETIME = datetime.datetime(year=_.year, month=_.month, day=_.day, hour=Settings.START_TIME.hour,
                                    minute=Settings.START_TIME.minute, second=Settings.START_TIME.second)
