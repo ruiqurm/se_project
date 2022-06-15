@@ -183,7 +183,6 @@ class ChargeStation:
         self.t.cancel()
         self.now_tran.finish(cancel=True)
         self.now_tran = None
-        self.driver.signal_station_cancel(station=self)
 
     def report_error(self) -> None:
         """汇报一个错误
@@ -192,9 +191,7 @@ class ChargeStation:
         self.status = Settings.CHARGE_STATION_STATUS_ERR
         ChargeStationModel.update(status=self.status).where(ChargeStationModel.id == self.id).execute()
         if self.now_tran is not None:
-            self.t.cancel()
-            self.now_tran.finish()
-            self.now_tran = None
+            self.cancel()
         self.driver.signal_station_error(station=self)
 
 
@@ -204,10 +201,21 @@ class StationMgmt:
 
     def __init__(self, stations: List[ChargeStation]) -> None:
         self.stations = {}  # dict[int,ChargeStation]
+        self.slow = []
+        self.fast = []
         for s in stations:
+            if s.type == Settings.TRAN_CHARGE_MODE_SLOW:
+                self.slow.append(s)
+            elif s.type == Settings.TRAN_CHARGE_MODE_FAST:
+                self.fast.append(s)
             self.stations[s.id] = s
         self.f_id = 0
         self.s_id = 0
+    def get_slow_stations(self) ->List[int]:
+        return [i.id for i in self.slow]
+
+    def get_fast_stations(self) ->List[int]:
+        return [i.id for i in self.fast]
 
     def get_status(self) -> List[StationStatus]:
         status_list = []

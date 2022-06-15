@@ -24,8 +24,8 @@ class Driver:
 	def push(self,user:User,mode:int,quantity:float)->None:
 		self.scheduler.on_push(user.id,mode,quantity)
 
-	def signal_station_cancel(self,station:'ChargeStation')->None:
-		self.scheduler.on_cancel(station)
+	def signal_station_cancel(self,tran:Transaction)->None:
+		self.scheduler.on_cancel(tran)
 
 	def signal_station_off(self,station:'ChargeStation')->None:
 		# asyncio.create_task(self.scheduler.on_station_off())

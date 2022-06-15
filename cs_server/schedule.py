@@ -7,12 +7,13 @@ from typing import List
 
 from .settings import Settings
 from .transaction import Transaction
-from .charge_station import ChargeStation
+from .charge_station import ChargeStation,StationMgmt
 import numpy as np
 
 class Scheduler:
-	def __init__(self, slow_stations: List[int],fast_stations:List[int]):
-		self.areaMngt=AreaMgmt(slow_stations,fast_stations)
+	def __init__(self, sm:StationMgmt):
+		self.station_mgmt = sm
+		self.areaMngt=AreaMgmt(sm.get_slow_stations(),sm.get_fast_stations())
 	def on_finish(self,station_id:int)->None:
 		"""完成充电
 
@@ -81,13 +82,16 @@ class Scheduler:
 		raise
 		# ret=AreaMgmt.update_quantity(uid,value)
 		pass
-	def on_cancel(self,station_id:int):
+	def on_cancel(self,tran:Transaction):
 		"""充电事务取消
 
 		Args:
 			tran (Transaction): 充电事务
 		"""
-		# 不用再调用tran.cancel()了，这边改了一下，在传进来之前就被取消了。
+		# 如果这个事务在充电，记得调用充电桩的cancel
+		# 这个函数调用以后，在上面的充电桩就会finish，不用调用finish了。
+		# 其他情况，需要手动调用tran.finish(cancel=True)
+		# self.station_mgmt.cancel(station_id=?)
 		pass
 
 	def on_station_on(self,station_id:int):
