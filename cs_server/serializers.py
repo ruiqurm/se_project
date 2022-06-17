@@ -15,8 +15,9 @@ class StationStatus(pydantic.BaseModel):
 class Transaction():
 	pass
 
-class User():
-	pass
+class User(pydantic.BaseModel):
+	username : str
+	password : str
 
 class Bill():
 	pass
