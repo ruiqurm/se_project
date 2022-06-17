@@ -7,17 +7,42 @@
 下面列举了一下可能需要序列化的类
 """
 import pydantic
-
+from datetime import datetime, timedelta
+from typing import Optional
+from .settings import now
 
 class StationStatus(pydantic.BaseModel):
-	pass
+	time = now()
+	id: int
+	type: int
+	status: int
+	charge_frequency: int
+	charge_duration: float
+	charge_quantity: float
+	cumulative_charging_times: int
+	cumulative_charging_duration: float
+	cumulative_charging_quantity: float
+	cumulative_charging_fee: float
+	cumulative_serviing_fee: float
+	cumulative_total_fee: float
 
-class Transaction():
+class Transaction(pydantic.BaseModel):
 	pass
 
 class User(pydantic.BaseModel):
 	username : str
 	password : str
 
-class Bill():
-	pass
+class Bill(pydantic.BaseModel):
+	user_id: int
+	wait_id: str
+	id: Optional[int]
+	time: datetime
+	station_id: int
+	quantity: float
+	duration: timedelta
+	start_time: datetime
+	end_time: datetime
+	serving_fee: float
+	charging_fee: float
+	total_fee: float
