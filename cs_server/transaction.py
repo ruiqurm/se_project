@@ -197,7 +197,9 @@ class Transaction:
         else:
             return (self.end_time - self.start_time).total_seconds() * (self.speed / 3600.0)
     def set_wait_id(self,wait_id):
-        pass
+        self.wait_id = wait_id
+        TransactionModel.update(wait_id=wait_id).where(TransactionModel.id == self.id).execute()
+
 
 class Bill:
     def __init__(self,
