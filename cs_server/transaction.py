@@ -190,6 +190,14 @@ class Transaction:
         m = TransactionModel.create(user=userid,wait_id=wait_id, mode=mode, start_time=start_time, quantity=quantity, status=0)
         return Transaction(_id=m.id,wait_id=wait_id, userid=userid, mode=mode, start_time=start_time, quantity=quantity, status=0)
 
+    #schedule need
+    def get_remain_quantity(self):
+        if self.end_time is None:
+            return self.quantity
+        else:
+            return (self.end_time - self.start_time).total_seconds() * (self.speed / 3600.0)
+    def set_wait_id(self,wait_id):
+        pass
 
 class Bill:
     def __init__(self,
