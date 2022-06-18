@@ -2,4 +2,3 @@ pydantic
 peewee
 pytest
 cryptography
-pytest-asyncio
