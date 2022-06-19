@@ -7,7 +7,6 @@ from .transaction import Bill, Transaction
 import time
 from cryptography.fernet import Fernet
 from .settings import Settings
-from syncer import sync
 
 def encode(obj: str) -> str:
     f = Fernet(Settings.SECRET_KEY)

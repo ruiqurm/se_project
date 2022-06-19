@@ -11,15 +11,13 @@ from cs_server.schedule import Scheduler
 import datetime
 from cs_server import settings
 
-
-@pytest.fixture
+@pytest.fixture()
 def clear_db():
     init()
     ChargeStationModel.delete().execute()
     UserModel.delete().execute()
     TransactionModel.delete().execute()
     BillModel.delete().execute()
-
 
 def setup() -> Tuple[Driver, Scheduler, StationMgmt]:
     d = Driver(None)
@@ -154,7 +152,8 @@ class Command:
                 return f"[{self.triger_time.strftime('%H:%M:%S')}]修改 {self.vid} 模式={mode}"
 
 
-def test_chargeStation(clear_db):
+def test_chargeStation():
+    clear_db()
     driver, scheduler, station_mgmt = setup()
     users = [User.register(f"user{i}", f"user{i}") for i in range(1, 31)]
     Command.unuse_user = users

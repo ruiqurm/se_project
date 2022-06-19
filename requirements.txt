@@ -2,3 +2,6 @@ pydantic
 peewee
 pytest
 cryptography
+fastapi
+uvicorn
+numpy
