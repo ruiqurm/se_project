@@ -100,6 +100,7 @@ class BillModel(Model):
     serving_fee = FloatField()  # 服务费
     charging_fee = FloatField()  # 充电费
     total_fee = FloatField()
+    is_cancel = BooleanField(default=False) # 是否是取消的账单
     class Meta:
         database = db
 

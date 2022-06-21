@@ -191,12 +191,13 @@ class Scheduler:
 				print(tran.wait_id, tran.station_id, tran.userid)
 				self.station_mgmt.cancel(station_id=tran.station_id)
 				self.areaMngt.finish(area)
-				tran.finish(cancel=True)
+				# tran.finish(cancel=True)
 				# 等待队列有订单，调度
 				if self.areaMngt.charging[area].__len__() > 0:
 					self.station_mgmt.start(area, self.areaMngt.charging[area][0])
 			else:
 				print(tran.userid, tran.wait_id)
+				tran.finish(cancel=True)	# 如果没有在充电，也要结束
 				self.areaMngt.leaveoff(area, tran.wait_id)
 			# 有空位，调度
 			self.toSchedule()
@@ -255,7 +256,7 @@ class Scheduler:
 		self.station_mgmt.cancel(station_id)
 		old_tran = self.areaMngt.charging[station_id][0]
 		tran = Transaction.new_transation(old_tran.userid, old_tran.mode,
-										  old_tran.tran_start_time, old_tran.quantity, old_tran.wait_id)
+										  now(), old_tran.quantity, old_tran.wait_id)
 		print(station_id, tran.userid, tran.station_id)
 		self.areaMngt.charging[station_id][0] = tran
 		# 出错队列
