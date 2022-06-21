@@ -15,25 +15,53 @@ class Scheduler:
 	def __init__(self, sm:StationMgmt):
 		self.station_mgmt = sm
 		self.areaMngt=AreaMgmt(sm.get_slow_stations(),sm.get_fast_stations())
+		self.error_mode=0#0:优先级调度，1：时间调度
+		self.schedule_mode=0
+		self.areaMngt.schedule_mode=self.schedule_mode
 
 	def toSchedule(self)->None:
 		schedule_list = self.areaMngt.system_schedule()  # [[wait_id,station]..],(int,int)
-		vis = []
-		if self.areaMngt.error_stationId is not None and self.areaMngt.charging[self.areaMngt.error_stationId].__len__()>0:
+		print("*******")
+		if self.areaMngt.error_stationId.__len__()>0:
+			vis = []
 			for id,station in schedule_list:
 				if station not in vis and self.areaMngt.charging[station].__len__()==0:
 					vis.append(station)
-					self.station_mgmt.start(station,self.areaMngt.charging[self.areaMngt.error_stationId][id])
+					self.station_mgmt.start(station,self.areaMngt.charging[self.areaMngt.error_stationId[0]][id])
 			self.areaMngt.from_error_to_charge(schedule_list)
-			if self.areaMngt.charging[self.areaMngt.error_stationId].__len__()==0:
-				schedule_list=self.areaMngt.system_schedule()
-		if self.areaMngt.error_stationId is None or self.areaMngt.charging[self.areaMngt.error_stationId].__len__()==0:
+			if self.areaMngt.charging[self.areaMngt.error_stationId[0]].__len__()==0:
+				self.areaMngt.empty_error_stationId.append(self.areaMngt.error_stationId[0])
+				self.areaMngt.error_stationId.pop(0)
+				self.toSchedule()
+				# schedule_list=self.areaMngt.system_schedule()
+		if self.areaMngt.error_stationId.__len__()==0:
+			vis = []
 			for wait_id, station in schedule_list:
 				if station not in vis and self.areaMngt.charging[station].__len__() == 0:
 					vis.append(station)
 					self.station_mgmt.start(station, self.areaMngt.waiting[wait_id])
+					print(station,self.areaMngt.waiting[wait_id].station_id)
 			self.areaMngt.from_wait_to_charge(schedule_list)
 
+		print(schedule_list)
+		print("waiting")
+		for i in self.areaMngt.waiting:
+			print(i.userid)
+		for station,que in self.areaMngt.charging.items():
+			print("station ",station)
+			for j in que:
+				print("(",j.userid,j.station_id,")")
+		print("*******")
+
+	def judge_empty_and_batch_schedule(self):
+		fl = 0
+		for i, x in self.areaMngt.charging.items():
+			if x.__len__() > 0:
+				fl = 1
+		tmp = self.areaMngt.station_sum * self.areaMngt.each_queue_size + self.areaMngt.waiting_area_size
+		if fl == 0 and self.areaMngt.another_area.__len__() >= tmp:
+			self.areaMngt.batch_best_scheduel(self.areaMngt.another_area[:tmp])
+			del self.areaMngt.another_area[:tmp]
 	def on_finish(self,station_id:int)->None:
 		"""完成充电
 
@@ -41,11 +69,29 @@ class Scheduler:
 			station (ChargeStation): 完成充电的充电桩
 		"""
 		# 不用再调用tran.finish()了，前面会自动调用
-		self.areaMngt.finish(station_id)
-		if self.areaMngt.charging[station_id].__len__()>0:
-			self.station_mgmt.start(station_id,self.areaMngt.charging[station_id][0])
-		#调度
-		self.toSchedule()
+		print("on finish")
+		if self.schedule_mode==0:
+			self.areaMngt.finish(station_id)
+			if self.areaMngt.charging[station_id].__len__()>0:
+				self.station_mgmt.start(station_id,self.areaMngt.charging[station_id][0])
+			#调度
+			self.toSchedule()
+		elif self.schedule_mode==1:
+			self.areaMngt.charging[station_id].pop(0)
+			if self.areaMngt.charging[station_id].__len__() > 0:
+				self.station_mgmt.start(station_id, self.areaMngt.charging[station_id][0])
+			self.toSchedule()
+		else:
+			self.areaMngt.charging[station_id].pop(0)
+			if self.areaMngt.charging[station_id].__len__() > 0:
+				self.station_mgmt.start(station_id, self.areaMngt.charging[station_id][0])
+			if self.areaMngt.waiting.__len__()>0:
+				self.areaMngt.charging[station_id].append(self.areaMngt.waiting[0])
+				self.areaMngt.waiting.pop(0)
+			else:
+				self.judge_empty_and_batch_schedule()
+
+
 
 
 
@@ -56,10 +102,14 @@ class Scheduler:
 			station (str): 出现异常的充电桩
 		"""
 		#改充电桩正在充电的tran
-		tran=self.areaMngt.charging[station_id][0]#Transaction
+		print("on error")
 		#todo 是否需要生成新的tran，还是修改当前的tran继续使用，以下按修改当前tran做
 		#生成bill，Transaction.cancelFlag????
-		tran.finish(cancel=False)
+		self.station_mgmt.cancel(station_id)
+		old_tran=self.areaMngt.charging[station_id][0]
+		tran=Transaction.new_transation(old_tran.userid,old_tran.mode,
+										old_tran.tran_start_time,old_tran.quantity,old_tran.wait_id)
+		self.areaMngt.charging[station_id][0]=tran
 		self.areaMngt.error_remake(station_id)
 		#调度
 		self.toSchedule()
@@ -73,15 +123,20 @@ class Scheduler:
 		"""
 		# 如果可以提交
 		# 用下面的代码
-		print("push ")
-		if self.areaMngt.waiting.__len__()>=self.areaMngt.waiting_area_size:
-			return "wait area full"
-		trans=Transaction.new_transation(user_id,mode,datetime.datetime.now(),quantity)
-		self.areaMngt.waiting_add(trans)
-		print(trans.station_id)
-		#调度
-		self.toSchedule()
-		return trans.wait_id
+		print("on push")
+		if self.schedule_mode==2:
+			trans = Transaction.new_transation(user_id, mode, datetime.datetime.now(), quantity, None)
+			self.areaMngt.another_area.append(trans)
+			if self.areaMngt.waiting.__len__()==0:
+				self.judge_empty_and_batch_schedule()
+		else:
+			if self.areaMngt.waiting.__len__()>=self.areaMngt.waiting_area_size:
+				return "wait area full"
+			trans=Transaction.new_transation(user_id,mode,datetime.datetime.now(),quantity,None)
+			self.areaMngt.waiting_add(trans)
+			#调度
+			self.toSchedule()
+			return trans.wait_id
 
 	def on_update_mode(self,tran:Transaction,mode:int):
 		"""充电订单模式更新模式
@@ -91,7 +146,7 @@ class Scheduler:
 			mode (int): 模式，这里暂定为int
 		"""
 		# 调用Transaction.update_mode()
-		print("update ")
+		print("on update mode")
 		area=self.areaMngt.get_trans_area(tran.wait_id)
 		if area==-2:
 			return "not exist"
@@ -112,7 +167,7 @@ class Scheduler:
 		"""
 		# 调用Transaction.update_quantity()
 
-		print("update quantity")
+		print("on update quantity")
 		area=self.areaMngt.get_trans_area(tran.wait_id)
 		if area==-2:
 			return "not exist"
@@ -130,7 +185,7 @@ class Scheduler:
 		# 如果这个事务在充电，记得调用充电桩的cancel
 		# 这个函数调用以后，在上面的充电桩就会finish，不用调用finish了。
 		# 其他情况，需要手动调用tran.finish(cancel=True)
-		# self.station_mgmt.cancel(station_id=?)
+		print("on cancel")
 		area=self.areaMngt.get_trans_area(tran.wait_id)
 		if area==-2:
 			return "not exist"
@@ -138,13 +193,16 @@ class Scheduler:
 			if area>=0 and self.areaMngt.is_charging(tran.wait_id,area):
 				#todo
 				#充电桩的cancel还未实现,用finish(cancel=False)
-				tran.finish()
+				print(tran.wait_id,tran.station_id,tran.userid)
+				self.station_mgmt.cancel(station_id=tran.station_id)
 				self.areaMngt.finish(area)
+				# tran.finish(cancel=True)
+
 				#等待队列有订单，调度
 				if self.areaMngt.charging[area].__len__()>0:
 					self.station_mgmt.start(area,self.areaMngt.charging[area][0])
 			else:
-				tran.finish(cancel=True)
+				print(tran.userid,tran.wait_id)
 				self.areaMngt.leaveoff(area,tran.wait_id)
 			#有空位，调度
 			self.toSchedule()
@@ -157,7 +215,46 @@ class Scheduler:
 		Args:
 			station (ChargeStation): 充电桩
 		"""
-		pass
+		print("station on")
+		#从出错队列删除
+		if station_id in self.areaMngt.error_stationId:
+			self.areaMngt.error_stationId.pop(self.areaMngt.error_stationId.index(station_id))
+		elif station_id in self.areaMngt.empty_error_stationId:
+			self.areaMngt.empty_error_stationId.pop(self.areaMngt.empty_error_stationId.index((station_id)))
+		#找到同类充电桩队列
+		station_all=self.areaMngt.slow_station
+		if station_id in self.areaMngt.fast_station:
+			station_all=self.areaMngt.fast_station
+		#同类型未出错充电桩
+		station_to_schedule=[]
+		for i in station_all:
+			if i not in self.areaMngt.empty_error_stationId and i not in self.areaMngt.error_stationId:
+				station_to_schedule.append(i)
+		#可调度的tran
+		tran_to_schedule=[]
+		for i in station_to_schedule:
+			if i==station_id:
+				tran_to_schedule.extend(self.areaMngt.charging[i])
+				del self.areaMngt.charging[i][0:]
+			else:
+				tran_to_schedule.extend(self.areaMngt.charging[i][1:])
+				del self.areaMngt.charging[i][1:]
+		#按等待号排序
+		order_list=list(self.areaMngt.waitId2area.keys())
+		tran_to_schedule.sort(key=lambda x:order_list.index(x.wait_id))
+		#调度方案
+		schedule_list=self.areaMngt.system_schedule(station_to_schedule,tran_to_schedule)
+		#调度
+		vis=[]
+		for id,station in schedule_list:
+			if station not in vis and self.areaMngt.charging[station].__len__()==0:
+				vis.append(station)
+				self.station_mgmt.start(station,tran_to_schedule[id])
+		for id,station in schedule_list:
+			self.areaMngt.charging[station].append(tran_to_schedule[id])
+			self.areaMngt.waitId2area[tran_to_schedule[id].wait_id]=station
+		del tran_to_schedule
+
 
 	def on_station_off(self,station_id:int):
 		"""充电桩关闭
@@ -165,7 +262,52 @@ class Scheduler:
 		Args:
 			station (str): 充电桩
 		"""
-		pass
+		print("on start")
+		self.station_mgmt.cancel(station_id)
+		old_tran = self.areaMngt.charging[station_id][0]
+		tran = Transaction.new_transation(old_tran.userid, old_tran.mode,
+										  old_tran.tran_start_time, old_tran.quantity, old_tran.wait_id)
+		print(station_id, tran.userid, tran.station_id)
+		self.areaMngt.charging[station_id][0] = tran
+		#出错队列
+		if self.areaMngt.charging[station_id].__len__()>0:
+			self.areaMngt.error_stationId.append(station_id)
+		else:
+			self.areaMngt.empty_error_stationId.append(station_id)
+		if self.error_mode==1:
+			# 找到同类充电桩队列
+			station_all = self.areaMngt.slow_station
+			if station_id in self.areaMngt.fast_station:
+				station_all = self.areaMngt.fast_station
+			# 同类型未出错充电桩
+			station_to_schedule = []
+			for i in station_all:
+				if i not in self.areaMngt.empty_error_stationId and i not in self.areaMngt.error_stationId:
+					station_to_schedule.append(i)
+			# 可调度的tran
+			tran_to_schedule = []
+			tran_to_schedule.extend(self.areaMngt.charging[station_id])
+			del self.areaMngt.charging[station_id][0:]
+			for i in station_to_schedule:
+					tran_to_schedule.extend(self.areaMngt.charging[i][1:])
+					del self.areaMngt.charging[i][1:]
+			# 按等待号排序
+			order_list = list(self.areaMngt.waitId2area.keys())
+			tran_to_schedule.sort(key=lambda x: order_list.index(x.wait_id))
+			# 调度方案
+			schedule_list = self.areaMngt.system_schedule(station_to_schedule, tran_to_schedule)
+			# 调度
+			vis = []
+			for id, station in schedule_list:
+				if station not in vis and self.areaMngt.charging[station].__len__() == 0:
+					vis.append(station)
+					self.station_mgmt.start(station, tran_to_schedule[id])
+			for id, station in schedule_list:
+				self.areaMngt.charging[station].append(tran_to_schedule[id])
+				self.areaMngt.waitId2area[tran_to_schedule[id].wait_id] = station
+			del tran_to_schedule
+		# 调度
+		self.toSchedule()
 
 
 class AreaMgmt:
@@ -187,11 +329,12 @@ class AreaMgmt:
 			self.charging[i]=[]
 		for i in self.fast_station:
 			self.charging[i]=[]
-		self.full_station=[]
+		self.another_area=[]
 		self.waitId2area={}# waiting area:-1, charging:>0, 有序字典(python version>=3.6
 		self.schedule_mode=0
 		self.error_mode=0
-		self.error_stationId=None
+		self.error_stationId=[]
+		self.empty_error_stationId=[]
 
 	# def system_schedule(self):
 	# 	if self.waiting.__len__()>0 and self.full_station.__len__()<self.station_sum:
@@ -330,15 +473,18 @@ class AreaMgmt:
 			del self.waiting[selected_i]
 			return 1
 
-	def system_schedule(self):
+	def system_schedule(self,stations=None,trans=None):
 		schedule_list = []
-		if self.error_stationId and self.charging[self.error_stationId].__len__()>0:
-			station_all=None
-			if self.error_stationId in self.fast_station:
-				station_all=copy.copy(self.fast_station)
-			else:
-				station_all=copy.copy(self.fast_station)
-			station_all.pop(station_all.index(self.error_stationId))
+		if self.error_stationId.__len__()>0 or (stations is not None and trans is not None):
+			station_all=stations
+			trans_to_schedule=trans
+			if station_all is None:
+				if self.error_stationId[0] in self.fast_station:
+					station_all=copy.copy(self.fast_station)
+				else:
+					station_all=copy.copy(self.slow_station)
+				station_all.pop(station_all.index(self.error_stationId[0]))
+				trans_to_schedule=self.charging[self.error_stationId[0]]
 			station_to_schedule=[]
 			queue_remain_num=[]
 			quantity_to_wait=[]
@@ -350,7 +496,7 @@ class AreaMgmt:
 					for j in self.charging[i]:
 						now=now+j.get_remain_quantity()
 					quantity_to_wait.append(now)
-			for i,x in enumerate(self.charging[self.error_stationId]):
+			for i,x in enumerate(trans_to_schedule):
 				if station_to_schedule.__len__()>0:
 					pos=quantity_to_wait.index(min(quantity_to_wait))
 					schedule_list.append((i,station_to_schedule[pos]))
@@ -366,7 +512,8 @@ class AreaMgmt:
 			b=[[],[]]
 			c=[[],[]]
 			for i,x in self.charging.items():
-				if self.error_stationId!=i and x.__len__()<self.each_queue_size:
+				if i not in self.error_stationId and i not in self.empty_error_stationId\
+						and x.__len__()<self.each_queue_size:
 					mode=1
 					if i in self.fast_station:
 						mode=0   #0:fast
@@ -392,27 +539,41 @@ class AreaMgmt:
 
 
 
-
-
 	def error_remake(self,error_station_id):
-		self.error_stationId=error_station_id
+		self.error_stationId.append(error_station_id)
 		#时间顺序调度
 		if self.error_mode==1:
-			station_all=None
+			# 找到同类充电桩队列
+			station_all = self.slow_station
 			if error_station_id in self.fast_station:
-				station_all=copy.copy(self.fast_station)
-			else:
-				station_all=copy.copy(self.slow_station)
-
-			tran_all=[]
+				station_all = self.fast_station
+			# 同类型未出错充电桩
+			station_to_schedule = []
 			for i in station_all:
-				for j in range(1,self.charging[i].__len__()):
-					tran_all.append(self.charging[i][j])
-					del self.charging[i][j]
-			tran_all.append(self.charging[error_station_id][0])
-			del self.charging[error_station_id][0]
-			my_order=list(copy.copy(self.waitId2area.keys()))
-			self.charging[error_station_id]=sorted(tran_all,key=lambda x:my_order.index(x.wait_id))
+				if i not in self.empty_error_stationId and i not in self.error_stationId:
+					station_to_schedule.append(i)
+			# 可调度的tran
+			tran_to_schedule = []
+			tran_to_schedule.extend(self.charging[error_station_id])
+			del self.charging[error_station_id][0:]
+			for i in station_to_schedule:
+					tran_to_schedule.extend(self.charging[i][1:])
+					del self.charging[i][1:]
+			# 按等待号排序
+			order_list = list(self.waitId2area.keys())
+			tran_to_schedule.sort(key=lambda x: order_list.index(x.wait_id))
+			# 调度方案
+			schedule_list = self.system_schedule(station_to_schedule, tran_to_schedule)
+			# 调度
+			vis = []
+			for id, station in schedule_list:
+				if station not in vis and self.charging[station].__len__() == 0:
+					vis.append(station)
+					self.station_mgmt.start(station, tran_to_schedule[id])
+			for id, station in schedule_list:
+				self.areaMngt.charging[station].append(tran_to_schedule[id])
+				self.areaMngt.waitId2area[tran_to_schedule[id].wait_id] = station
+			del tran_to_schedule
 
 
 	def single_best_schedule(self):
@@ -434,9 +595,7 @@ class AreaMgmt:
 		for now,x in enumerate(user_list):
 			i,j=pos_weight[now][0],pos_weight[now][1]
 			#参数 todo
-			self.charging[i][j]=Transaction(user=x[0],value=x[1])
-
-
+			self.charging[i][j]=x
 
 
 	def is_available(self):
@@ -449,18 +608,20 @@ class AreaMgmt:
 	def from_wait_to_charge(self, schedule_list):
 		for id,stationid in schedule_list:
 			self.charging[stationid].append(self.waiting[id])
-			self.waitId2area[self.waiting[id].wait_id]=stationid
+			if self.schedule_mode==0:
+				self.waitId2area[self.waiting[id].wait_id]=stationid
 		now=0
 		for id,_ in schedule_list:
 			self.waiting.pop(id-now)
 			now+=1
 	def from_error_to_charge(self, schedule_list):
 		for id,station in schedule_list:
-			self.charging[station].append(self.charging[self.error_stationId][id])
-			self.waitId2area[self.charging[self.error_stationId][id].wait_id]=station
+			self.charging[station].append(self.charging[self.error_stationId[0]][id])
+			if self.schedule_mode==0:
+				self.waitId2area[self.charging[self.error_stationId[0]][id].wait_id]=station
 		now=0
 		for id,_ in schedule_list:
-			self.charging[self.error_stationId].pop(id-now)
+			self.charging[self.error_stationId[0]].pop(id-now)
 			now+=1
 	def get_trans_area(self, wait_id):
 		if self.waitId2area.__contains__(wait_id):
@@ -469,6 +630,8 @@ class AreaMgmt:
 			return -2
 
 	def is_charging(self, wait_id, area):
+		if area in self.error_stationId or area in self.empty_error_stationId:
+			return False
 		if self.charging[area].__len__()>0 and self.charging[area][0].wait_id==wait_id:
 			return True
 		else:
@@ -492,9 +655,11 @@ class AreaMgmt:
 				if x.wait_id==wait_id:
 					pos=i
 					break
-			if pos:
+			print("waiting",area, pos, "leave")
+			if pos is not None:
 				wait_id=self.waiting[pos].wait_id
-				self.waitId2area.pop(wait_id)
+				if self.schedule_mode==0:
+					self.waitId2area.pop(wait_id)
 				self.waiting.pop(pos)
 		else:
 			pos=None
@@ -502,18 +667,27 @@ class AreaMgmt:
 				if x.wait_id==wait_id:
 					pos=i
 					break
-			if pos:
+			print("charging",area,pos,"leave")
+			if pos is not None:
+
 				wait_id=self.charging[area][pos].wait_id
-				self.waitId2area.pop(wait_id)
+				if self.schedule_mode==0:
+					self.waitId2area.pop(wait_id)
 				self.charging[area].pop(pos)
 
 	def waiting_add(self, trans):
-		self.waiting.append(trans)
-		self.waitId2area[trans.wait_id]=-1
+		if self.schedule_mode == 0:
+			self.waiting.append(trans)
+			self.waitId2area[trans.wait_id]=-1
+		elif self.schedule_mode==1:
+			arr=[x.quantity for x in self.waiting]
+			pos=self.get_insert_pos(arr,trans.quantity)
+			self.waiting.insert(pos,trans)
 
 	def finish(self, station_id):
 		wait_id=self.charging[station_id][0].wait_id
-		self.waitId2area.pop(wait_id)
+		if self.schedule_mode==0:
+			self.waitId2area.pop(wait_id)
 		self.charging[station_id].pop(0)
 
 

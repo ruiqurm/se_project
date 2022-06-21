@@ -184,11 +184,18 @@ class Transaction:
             )
         return trans_list
 
+    #sjd change
     @classmethod
-    def new_transation(cls, userid: int, mode: int, start_time: datetime, quantity: float):
-        wait_id = get_number(mode)
-        m = TransactionModel.create(user=userid,wait_id=wait_id, mode=mode, start_time=start_time, quantity=quantity, status=0)
-        return Transaction(_id=m.id,wait_id=wait_id, userid=userid, mode=mode, start_time=start_time, quantity=quantity, status=0)
+    def new_transation(cls, userid: int, mode: int, start_time: datetime, quantity: float, waitId: str):
+        wait_id = None
+        if waitId is None:
+            wait_id = get_number(mode)
+        else:
+            wait_id = waitId
+        m = TransactionModel.create(user=userid, wait_id=wait_id, mode=mode, start_time=start_time, quantity=quantity,
+                                    status=0)
+        return Transaction(_id=m.id, wait_id=wait_id, userid=userid, mode=mode, start_time=start_time,
+                           quantity=quantity, status=0)
 
     #schedule need
     def get_remain_quantity(self):
