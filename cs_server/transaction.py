@@ -186,8 +186,7 @@ class Transaction:
 
     #sjd change
     @classmethod
-    def new_transation(cls, userid: int, mode: int, start_time: datetime, quantity: float, waitId: str):
-        wait_id = None
+    def new_transation(cls, userid: int, mode: int, start_time: datetime, quantity: float, waitId = None):
         if waitId is None:
             wait_id = get_number(mode)
         else:

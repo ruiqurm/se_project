@@ -6,10 +6,9 @@ import datetime
 
 from typing import List
 
-from .settings import Settings,get_number
+from .settings import Settings,now
 from .transaction import Transaction
 from .charge_station import ChargeStation,StationMgmt
-import numpy as np
 
 class Scheduler:
 	def __init__(self, sm:StationMgmt):
@@ -125,14 +124,14 @@ class Scheduler:
 		# 用下面的代码
 		print("on push")
 		if self.schedule_mode==2:
-			trans = Transaction.new_transation(user_id, mode, datetime.datetime.now(), quantity, None)
+			trans = Transaction.new_transation(user_id, mode, now(), quantity, None)
 			self.areaMngt.another_area.append(trans)
 			if self.areaMngt.waiting.__len__()==0:
 				self.judge_empty_and_batch_schedule()
 		else:
 			if self.areaMngt.waiting.__len__()>=self.areaMngt.waiting_area_size:
 				return "wait area full"
-			trans=Transaction.new_transation(user_id,mode,datetime.datetime.now(),quantity,None)
+			trans=Transaction.new_transation(user_id,mode,now(),quantity,None)
 			self.areaMngt.waiting_add(trans)
 			#调度
 			self.toSchedule()
