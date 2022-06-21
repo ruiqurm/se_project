@@ -191,8 +191,7 @@ class Scheduler:
 				print(tran.wait_id, tran.station_id, tran.userid)
 				self.station_mgmt.cancel(station_id=tran.station_id)
 				self.areaMngt.finish(area)
-				# tran.finish(cancel=True)
-
+				tran.finish(cancel=True)
 				# 等待队列有订单，调度
 				if self.areaMngt.charging[area].__len__() > 0:
 					self.station_mgmt.start(area, self.areaMngt.charging[area][0])

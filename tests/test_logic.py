@@ -46,8 +46,10 @@ class Command:
     vid_to_user: Dict[int, User] = {}
     base = settings.TODAY_DATETIME
     def __init__(self, triger_time: datetime.time, v1, v2, v3, v4):
+        self.summarize = f"({v1},{v2},{v3},{v4})"
         self.triger_time = triger_time
         self.type = v1
+        self.snapshot = None
         if v1 == "A":
             vid = v2
             self.vid = vid
@@ -97,14 +99,17 @@ class Command:
                 self.quantity = float(v4)
 
     def execute(self, driver: Driver, station_mgmt: StationMgmt):
+        is_new_tran = False
         if self.type == 'A':
             if self.quantity is not None:
                 driver.push(self.user, self.mode, self.quantity)
+                is_new_tran = True
             else:
                 t = self.user.get_running_transaction()
                 driver.signal_station_cancel(t)
         elif self.type == 'B':
             if self.station_mode == True:
+
                 station_mgmt.turn_on(self.station_id)
             else:
                 station_mgmt.turn_off(self.station_id)
@@ -114,6 +119,7 @@ class Command:
                 driver.update_quantity(t, self.quantity)
             if self.mode is not None:
                 driver.update_mode(t, self.mode)
+        return is_new_tran
 
     def time(self) -> datetime.datetime:
         return self.base + datetime.timedelta(hours=self.triger_time.hour, minutes=self.triger_time.minute,
@@ -151,9 +157,17 @@ class Command:
             elif self.mode > 0:
                 return f"[{self.triger_time.strftime('%H:%M:%S')}]修改 {self.vid} 模式={mode}"
 
-
-def test_chargeStation():
-    clear_db()
+    def get_snapshot(self,driver:Driver,tids_to_vids:Dict[int,str]):
+        """
+        截取快照
+        """
+        scheduler:Scheduler = driver.scheduler
+        mgmt = scheduler.areaMngt
+        from cs_server.serializers import Snapshot
+        self.snapshot = Snapshot(description=self.summarize,detail=str(self),
+                                 waiting_area=[tids_to_vids[t.id] for t in mgmt.waiting],
+                                 station_area={i:[tids_to_vids[j.id] for j in mgmt.charging[i]] for i in mgmt.charging})
+def test_chargeStation(clear_db):
     driver, scheduler, station_mgmt = setup()
     users = [User.register(f"user{i}", f"user{i}") for i in range(1, 31)]
     Command.unuse_user = users
@@ -201,16 +215,26 @@ def test_chargeStation():
                 Command(datetime.time(10, 0), 'A', 'V30', 'T', 10),
                 Command(datetime.time(10, 50), 'B', 'F1', 'O', 1)
                 ]
-    settings.START_DATETIME = datetime.datetime.now()
+
     _ = datetime.datetime.today()
     datetime.datetime(year=_.year, month=_.month, day=_.day, hour=Settings.START_TIME.hour,
                       minute=Settings.START_TIME.minute, second=Settings.START_TIME.second)
-    for i in commands:
-        print(i)
+    # for i in commands:
+    #     print(i)
     # 测试
-    # for i,command in enumerate(commands):
-    #     if i != 0:
-    #         last = commands[i-1]
-    #         sleep_time = virtual_time_to_real_interval(command.time(),last.time())
-    #         time.sleep(sleep_time)
-    #     command.execute(driver,station_mgmt)
+    tids_to_vids : Dict[int,str] = {}
+    for i,command in enumerate(commands):
+        if i != 0:
+            last = commands[i-1]
+            sleep_time = virtual_time_to_real_interval(command.time(),last.time())
+            time.sleep(sleep_time)
+        else:
+            settings.START_DATETIME = datetime.datetime.now()
+        is_new_tran = command.execute(driver,station_mgmt)
+        # 绑定vid和transaction
+        if is_new_tran:
+            tids_to_vids[command.user.get_running_transaction().id] = command.vid
+        # 获取排队的实况
+        # command.get_snapshot(driver,tids_to_vids)
+    while(TransactionModel.select().where(TransactionModel.status == 0).count() != 0):
+        time.sleep(1)

@@ -60,7 +60,15 @@ class Transaction:
         self.station_id = station_id
         self.status = status
         self.start_time = now()
-        self.speed = speed
+        if speed is None and mode is not None:
+            if mode == Settings.TRAN_CHARGE_MODE_SLOW:
+                self.speed = Settings.SC_STATION_SPEED
+            else:
+                self.speed = Settings.FC_STATION_SPEED
+        elif speed is not None:
+            self.speed = speed
+        else:
+            raise
         self.cancelFlag = False
 
     def calculate_serving_fee(self) -> float:

@@ -8,7 +8,7 @@
 """
 import pydantic
 from datetime import datetime, timedelta
-from typing import Optional
+from typing import Optional, List, Dict
 from .settings import now
 
 class StationStatus(pydantic.BaseModel):
@@ -46,3 +46,12 @@ class Bill(pydantic.BaseModel):
 	serving_fee: float
 	charging_fee: float
 	total_fee: float
+
+class Snapshot(pydantic.BaseModel):
+	"""
+	每次动作后，充电区内的状态
+	"""
+	description : str
+	detail : Optional[str]
+	waiting_area : List[str]
+	station_area : Dict[int,List[str]]
