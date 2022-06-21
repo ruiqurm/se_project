@@ -329,9 +329,7 @@ class AreaMgmt:
 			self.charging[i]=[]
 		for i in self.fast_station:
 			self.charging[i]=[]
-		self.another_area=None
-		if self.schedule_mode==2:
-			self.another_area=[]
+		self.another_area=[]
 		self.waitId2area={}# waiting area:-1, charging:>0, 有序字典(python version>=3.6
 		self.schedule_mode=0
 		self.error_mode=0
