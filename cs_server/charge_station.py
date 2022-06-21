@@ -86,7 +86,7 @@ class ChargeStation:
     @classmethod
     def create_station(cls, type: int, driver: driver.Driver):
         m = ChargeStationModel.create(type=type, status=Settings.CHARGE_STATION_STATUS_OFF,
-                                      charging_power=Settings.SC_STATION_SPEED if Settings.TRAN_CHARGE_MODE_SLOW
+                                      charging_power=Settings.SC_STATION_SPEED if type == Settings.TRAN_CHARGE_MODE_SLOW
                                       else Settings.FC_STATION_SPEED,
                                       cumulative_charging_times=0,
                                       cumulative_charging_duration=timedelta(seconds=0),
@@ -97,7 +97,7 @@ class ChargeStation:
                                       )
         return cls(_id=m.id, _type=type, status=Settings.CHARGE_STATION_STATUS_OFF,
                    charging_power=Settings.SC_STATION_SPEED
-                   if Settings.TRAN_CHARGE_MODE_SLOW else Settings.FC_STATION_SPEED,
+                   if type == Settings.TRAN_CHARGE_MODE_SLOW else Settings.FC_STATION_SPEED,
                    cumulative_charging_times=0,
                    cumulative_charging_duration=timedelta(seconds=0),
                    cumulative_charging_quantity=0,

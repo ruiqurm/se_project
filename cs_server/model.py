@@ -69,6 +69,7 @@ class TransactionModel(Model):
     user = ForeignKeyField(UserModel, backref='transations',null=True)
     mode = IntegerField()
     start_time = DateTimeField()
+    start_charge_time = DateTimeField(null=True)
     end_time = DateTimeField(null=True)
     waiting_time = TimeDeltaField(null=True)  # timedelta
     charge_time = TimeDeltaField(null=True)  # timedelta

@@ -43,6 +43,7 @@ class Transaction:
                  serving_fee: Optional[float] = None,
                  charging_fee: Optional[float] = None,
                  station_id: Optional[int] = None,
+                 speed : Optional[float] = None,
                  **kwargs: Any):
         super().__init__(**kwargs)
         self.id = _id
@@ -59,7 +60,7 @@ class Transaction:
         self.station_id = station_id
         self.status = status
         self.start_time = now()
-        self.speed = Settings.SC_STATION_SPEED
+        self.speed = speed
         self.cancelFlag = False
 
     def calculate_serving_fee(self) -> float:
@@ -147,7 +148,7 @@ class Transaction:
         self.start_time = now()
         self.calculate_end_time()
         self.waiting_time = self.start_time - self.tran_start_time
-        TransactionModel.update(station_id=station_id, waiting_time=self.waiting_time,
+        TransactionModel.update(station_id=station_id, waiting_time=self.waiting_time,start_charge_time=now(),
                                                    end_time=self.end_time).where(TransactionModel.id == self.id).execute()
 
     @classmethod
@@ -191,10 +192,14 @@ class Transaction:
             wait_id = get_number(mode)
         else:
             wait_id = waitId
+        if mode == Settings.TRAN_CHARGE_MODE_SLOW:
+            speed = Settings.SC_STATION_SPEED
+        else:
+            speed = Settings.FC_STATION_SPEED
         m = TransactionModel.create(user=userid, wait_id=wait_id, mode=mode, start_time=start_time, quantity=quantity,
                                     status=0)
         return Transaction(_id=m.id, wait_id=wait_id, userid=userid, mode=mode, start_time=start_time,
-                           quantity=quantity, status=0)
+                           quantity=quantity, status=0,speed=speed)
 
     #schedule need
     def get_remain_quantity(self):
