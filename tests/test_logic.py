@@ -1,3 +1,4 @@
+import json
 import time
 from typing import Dict, Optional, Tuple, List
 from cs_server.model import BillModel, UserModel, ChargeStationModel, TransactionModel, SqliteDatabase, init
@@ -11,6 +12,7 @@ from cs_server.schedule import Scheduler
 import datetime
 from cs_server import settings
 
+
 @pytest.fixture()
 def clear_db():
     init()
@@ -18,6 +20,7 @@ def clear_db():
     UserModel.delete().execute()
     TransactionModel.delete().execute()
     BillModel.delete().execute()
+
 
 def setup() -> Tuple[Driver, Scheduler, StationMgmt]:
     d = Driver(None)
@@ -36,15 +39,23 @@ def setup() -> Tuple[Driver, Scheduler, StationMgmt]:
     return d, sch, sm
 
 
-def virtual_time_to_real_interval(t2: datetime.datetime,t1:datetime.datetime) -> float:
+def virtual_time_to_real_interval(t2: datetime.datetime, t1: datetime.datetime) -> float:
     # 计算真实睡眠时间
     return ((t2 - t1) / Settings.TIME_FLOW_RATE).total_seconds()
 
+def get_station_name(id:int):
+    if id >=1 and id<=3:
+        # SC
+        return f"SC{id}"
+    else:
+        # FC
+        return f"FC{id-3}"
 
 class Command:
     unuse_user = []
     vid_to_user: Dict[int, User] = {}
     base = settings.TODAY_DATETIME
+
     def __init__(self, triger_time: datetime.time, v1, v2, v3, v4):
         self.summarize = f"({v1},{v2},{v3},{v4})"
         self.triger_time = triger_time
@@ -123,7 +134,7 @@ class Command:
 
     def time(self) -> datetime.datetime:
         return self.base + datetime.timedelta(hours=self.triger_time.hour, minutes=self.triger_time.minute,
-                                         seconds=self.triger_time.second)
+                                              seconds=self.triger_time.second)
 
     def __str__(self):
         if self.type == 'A':
@@ -157,16 +168,20 @@ class Command:
             elif self.mode > 0:
                 return f"[{self.triger_time.strftime('%H:%M:%S')}]修改 {self.vid} 模式={mode}"
 
-    def get_snapshot(self,driver:Driver,tids_to_vids:Dict[int,str]):
+    def get_snapshot(self, driver: Driver, uids_to_vids):
         """
         截取快照
         """
-        scheduler:Scheduler = driver.scheduler
+        scheduler: Scheduler = driver.scheduler
         mgmt = scheduler.areaMngt
-        from cs_server.serializers import Snapshot
-        self.snapshot = Snapshot(description=self.summarize,detail=str(self),
-                                 waiting_area=[tids_to_vids[t.id] for t in mgmt.waiting],
-                                 station_area={i:[tids_to_vids[j.id] for j in mgmt.charging[i]] for i in mgmt.charging})
+        self.snapshot = {"time":self.triger_time.strftime('%H:%M:%S'),
+                         "description": self.summarize,
+                         # "detail":str(self),
+                         "waiting_area": [uids_to_vids[t.userid] for t in mgmt.waiting],
+                         "station_area": {get_station_name(i): [uids_to_vids[j.userid] for j in mgmt.charging[i]] for i in
+                                           mgmt.charging}}
+
+
 def test_chargeStation(clear_db):
     driver, scheduler, station_mgmt = setup()
     users = [User.register(f"user{i}", f"user{i}") for i in range(1, 31)]
@@ -222,19 +237,38 @@ def test_chargeStation(clear_db):
     # for i in commands:
     #     print(i)
     # 测试
-    tids_to_vids : Dict[int,str] = {}
-    for i,command in enumerate(commands):
+    uids_to_vids = {}
+    result = []
+    for i, command in enumerate(commands):
         if i != 0:
-            last = commands[i-1]
-            sleep_time = virtual_time_to_real_interval(command.time(),last.time())
+            last = commands[i - 1]
+            sleep_time = virtual_time_to_real_interval(command.time(), settings.now())
             time.sleep(sleep_time)
         else:
             settings.START_DATETIME = datetime.datetime.now()
-        is_new_tran = command.execute(driver,station_mgmt)
+        is_new_tran = command.execute(driver, station_mgmt)
         # 绑定vid和transaction
         if is_new_tran:
-            tids_to_vids[command.user.get_running_transaction().id] = command.vid
+            uids_to_vids[command.user.id] = command.vid
         # 获取排队的实况
-        # command.get_snapshot(driver,tids_to_vids)
-    while(TransactionModel.select().where(TransactionModel.status == 0).count() != 0):
+        command.get_snapshot(driver, uids_to_vids)
+        result.append(command.snapshot)
+        json.dump(result, open("snapshot.json", "w", encoding="utf-8"))
+    record_hour = settings.now().hour
+    while (TransactionModel.select().where(TransactionModel.status == 0).count() != 0):
         time.sleep(1)
+        now_time = settings.now()
+        if now_time.hour > record_hour:
+            record_hour = now_time.hour
+            scheduler: Scheduler = driver.scheduler
+            mgmt = scheduler.areaMngt
+            snapshot = {"time": now_time.strftime('%H:%M:%S'),
+                             "description": "-",
+                             # "detail":str(self),
+                             "waiting_area": [uids_to_vids[t.userid] for t in mgmt.waiting],
+                             "station_area": {get_station_name(i): [uids_to_vids[j.userid] for j in mgmt.charging[i]]
+                                              for i in
+                                              mgmt.charging}}
+            result.append(snapshot)
+
+    json.dump(result, open("snapshot.json", "w", encoding="utf-8"))

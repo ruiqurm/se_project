@@ -47,7 +47,7 @@ class Bill(pydantic.BaseModel):
 	charging_fee: float
 	total_fee: float
 
-class Snapshot(pydantic.BaseModel):
+class Snapshot():
 	"""
 	每次动作后，充电区内的状态
 	"""
