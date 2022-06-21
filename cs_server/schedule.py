@@ -253,10 +253,14 @@ class Scheduler:
 
 		"""
 		print("on start")
-		self.station_mgmt.cancel(station_id)
-		old_tran = self.areaMngt.charging[station_id][0]
+		# todo 这里是不是没判断是否有在充电
+		if len(self.areaMngt.charging[station_id]) == 0:
+			raise "如果充电桩上没车的情况未实现"
+		old_tran:Transaction = self.areaMngt.charging[station_id][0]
+		quantity = old_tran.quantity
+		self.station_mgmt.cancel(station_id) # cancel以后更新了quantity,这时用quantity再去减就行了
 		tran = Transaction.new_transation(old_tran.userid, old_tran.mode,
-										  now(), old_tran.quantity, old_tran.wait_id)
+										  now(), quantity - old_tran.quantity, old_tran.wait_id)
 		print(station_id, tran.userid, tran.station_id)
 		self.areaMngt.charging[station_id][0] = tran
 		# 出错队列
@@ -508,9 +512,9 @@ class AreaMgmt:
 			for i, x in self.charging.items():
 				if i not in self.error_stationId and i not in self.empty_error_stationId \
 						and x.__len__() < self.each_queue_size:
-					mode = 1
+					mode = Settings.TRAN_CHARGE_MODE_SLOW
 					if i in self.fast_station:
-						mode = 0  # 0:fast
+						mode = Settings.TRAN_CHARGE_MODE_FAST  # 0:fast
 					a[mode].append(i)
 					b[mode].append(self.each_queue_size - x.__len__())
 					now = 0
