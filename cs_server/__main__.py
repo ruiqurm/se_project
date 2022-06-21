@@ -11,33 +11,6 @@ from .schedule import AreaMgmt, Scheduler
 from .charge_station import StationStatus, ChargeStation, StationMgmt
 from .model import init
 from . import serializers
-class A:
-    def get_waiting(self, id):
-        return 0
-
-    def get_charging(self, id):
-        return ["t1", "t2"]
-class DumbScheduler:
-	def __init__(self, sm:StationMgmt):
-		self.station_mgmt = sm
-		self.areaMngt=A()
-	def on_finish(self,station_id:int)->None:
-		pass
-
-	def on_push(self,user_id,mode:int,quantity:float):
-		pass
-	def on_update_mode(self,tran:Transaction,mode:int):
-		pass
-	def on_update_quantity(self,tran,value:float):
-		pass
-	def on_cancel(self,tran):
-		pass
-
-	def on_station_on(self,station_id:int):
-		raise
-
-	def on_station_off(self,station_id:int):
-		pass
 driver: Optional[Driver] = None
 station_mgmt: Optional[StationMgmt] = None
 scheduler: Optional[Scheduler] = None
@@ -61,7 +34,7 @@ async def startup_event():
         ChargeStation.create_station(1, d)
     ]
     sm = StationMgmt(stations)
-    sch = DumbScheduler(sm)
+    sch = Scheduler(sm)
     # for station in stations:
     #     station.turn_on()
     d.scheduler = sch
