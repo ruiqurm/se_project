@@ -254,8 +254,10 @@ class Scheduler:
 		"""
 		print("on start")
 		# todo 这里是不是没判断是否有在充电
+		#没车不需要调度
 		if len(self.areaMngt.charging[station_id]) == 0:
-			raise "如果充电桩上没车的情况未实现"
+			self.areaMngt.empty_error_stationId.append(station_id)
+			return
 		old_tran:Transaction = self.areaMngt.charging[station_id][0]
 		quantity = old_tran.quantity
 		self.station_mgmt.cancel(station_id) # cancel以后更新了quantity,这时用quantity再去减就行了
