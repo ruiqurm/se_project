@@ -11,21 +11,6 @@ from datetime import datetime, timedelta
 from typing import Optional, List, Dict
 from .settings import now
 
-class StationStatus(pydantic.BaseModel):
-	time = now()
-	id: int
-	type: int
-	status: int
-	charge_frequency: int
-	charge_duration: float
-	charge_quantity: float
-	cumulative_charging_times: int
-	cumulative_charging_duration: float
-	cumulative_charging_quantity: float
-	cumulative_charging_fee: float
-	cumulative_serviing_fee: float
-	cumulative_total_fee: float
-
 class Transaction(pydantic.BaseModel):
 	pass
 

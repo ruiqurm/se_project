@@ -1,6 +1,8 @@
 """
 web服务器运行的地方
 """
+import datetime
+
 import uvicorn
 from fastapi import FastAPI
 from .user import User
@@ -50,7 +52,7 @@ def register(username: str, password: str) -> User:
     返回注册成功的用户
     """
     u = User.register(username, password)
-    return u
+    return serializers.User(username=u.username,password=u.password)
 
 
 @app.post("/login", response_model=str)
@@ -106,7 +108,7 @@ def cancel(Id: str) -> None:
     driver.signal_station_cancel(t)
 
 
-@app.post("/getTransaction", response_model=str)
+@app.get("/getTransaction", response_model=str)
 def getTransaction(Id: str) -> str:
     """查看本车排队号码 \n
     Id: 用户id \n
@@ -117,7 +119,7 @@ def getTransaction(Id: str) -> str:
     return t.wait_id
 
 
-@app.post("/getWaiting", response_model=int)
+@app.get("/getWaiting", response_model=int)
 def getWaiting(Id: str) -> int:
     """查看本充电模式下前车等待数量 \n
     Id: 用户id \n
@@ -128,7 +130,7 @@ def getWaiting(Id: str) -> int:
     return scheduler.areaMngt.get_waiting(t.id)
 
 
-@app.post("/getBills", response_model=List[serializers.Bill])
+@app.get("/getBills")
 def getBills(Id: str) -> List[Bill]:
     """查看充电详单 \n
     Id: 用户id \n
@@ -154,7 +156,7 @@ def stationOff(stationId: int) -> None:
     station_mgmt.turn_off(stationId)
 
 
-@app.post("/stationStatus", response_model=List[serializers.StationStatus])
+@app.get("/stationStatus")
 def stationStatus() -> List[StationStatus]:
     """查看充电桩状态 \n
     返回充电桩状态列表
@@ -162,7 +164,7 @@ def stationStatus() -> List[StationStatus]:
     return station_mgmt.get_status()
 
 
-@app.post("/stationId", response_model=List[serializers.User])
+@app.get("/stationId", response_model=List[serializers.User])
 def stationId(stationId: int) -> List[User]:
     """查看充电桩车辆 \n
     stationId: 充电桩id \n
@@ -175,7 +177,29 @@ def stationId(stationId: int) -> List[User]:
 def statistics():
     """数据统计
     """
-    return "statistics"
+    return station_mgmt.get_statistics()
+@app.get("/flushtime")
+def set_time():
+    global START_DATETIME
+    START_DATETIME = datetime.datetime.now()
+
+@app.get("/now")
+def get_now():
+    """
+    获取相对时间
+    """
+    from .settings import now
+    return now()
+@app.get("/flush")
+def flushdb():
+    """
+    刷新数据库
+    """
+    from .model import ChargeStationModel,UserModel,TransactionModel,BillModel
+    ChargeStationModel.delete().execute()
+    UserModel.delete().execute()
+    TransactionModel.delete().execute()
+    BillModel.delete().execute()
 
 from fastapi.staticfiles import StaticFiles
 from fastapi.openapi.docs import (

@@ -49,7 +49,7 @@ class Settings:
 
     MOCK_DATETIME = True
     START_TIME = datetime.time(hour=6, minute=0, second=0)
-    TIME_FLOW_RATE = 600
+    TIME_FLOW_RATE = 10
 
 
 s_id = 1
