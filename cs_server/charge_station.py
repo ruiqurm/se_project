@@ -7,17 +7,13 @@ from threading import Timer
 from . import driver
 from .model import ChargeStationModel
 from .transaction import Transaction
-from .settings import Settings,now,real_time
+from .settings import Settings, now, real_time
 
 
-class StationStatus:
+class Statistics:
     def __init__(self,
                  _id: int,
                  _type: int,
-                 status: int,
-                 charge_frequency: int,  # 系统启动后充电次数
-                 charge_duration: timedelta,  # 系统启动后充电时长,单位秒
-                 charge_quantity: float,  # 系统启动后充电量,单位瓦
                  cumulative_charging_times: int,  # 累计充电次数
                  cumulative_charging_duration: timedelta,  # 累计充电时长,单位秒
                  cumulative_charging_quantity: float,  # 累计充电量,单位瓦
@@ -28,16 +24,29 @@ class StationStatus:
         self.time = now()
         self.id = _id
         self.type = _type
-        self.status = status
-        self.charge_frequency = charge_frequency
-        self.charge_duration = charge_duration
-        self.charge_quantity = charge_quantity
+
         self.cumulative_charging_times = cumulative_charging_times
         self.cumulative_charging_duration = cumulative_charging_duration
         self.cumulative_charging_quantity = cumulative_charging_quantity
         self.cumulative_charging_fee = cumulative_charging_fee
         self.cumulative_serviing_fee = cumulative_serviing_fee
         self.cumulative_total_fee = cumulative_total_fee
+
+
+class StationStatus():
+    def __init__(self, id: int,
+                 status: int,
+                 type : int,
+                 charge_frequency: int,
+                 charge_duration: timedelta,
+                 charge_quantity: float,
+                 ):
+        self.id = id
+        self.type = type
+        self.status = status
+        self.charge_frequency = charge_frequency
+        self.charge_duration = charge_duration
+        self.charge_quantity = charge_quantity
 
 
 class ChargeStation:
@@ -85,7 +94,7 @@ class ChargeStation:
 
     @classmethod
     def create_station(cls, type: int, driver: driver.Driver):
-        m = ChargeStationModel.create(type=type, status=Settings.CHARGE_STATION_STATUS_OFF,
+        m = ChargeStationModel.create(type=type, status=Settings.CHARGE_STATION_STATUS_ON,
                                       charging_power=Settings.SC_STATION_SPEED if type == Settings.TRAN_CHARGE_MODE_SLOW
                                       else Settings.FC_STATION_SPEED,
                                       cumulative_charging_times=0,
@@ -95,7 +104,7 @@ class ChargeStation:
                                       cumulative_serviing_fee=0,
                                       cumulative_total_fee=0
                                       )
-        return cls(_id=m.id, _type=type, status=Settings.CHARGE_STATION_STATUS_OFF,
+        return cls(_id=m.id, _type=type, status=Settings.CHARGE_STATION_STATUS_ON,
                    charging_power=Settings.SC_STATION_SPEED
                    if type == Settings.TRAN_CHARGE_MODE_SLOW else Settings.FC_STATION_SPEED,
                    cumulative_charging_times=0,
@@ -110,7 +119,7 @@ class ChargeStation:
         主要用于演示
         调用driver.signal_station_on()
         """
-        ChargeStationModel.update(status=Settings.CHARGE_STATION_STATUS_ON)\
+        ChargeStationModel.update(status=Settings.CHARGE_STATION_STATUS_ON) \
             .where(ChargeStationModel.id == self.id).execute()
         self.driver.signal_station_on(station=self)
 
@@ -129,12 +138,17 @@ class ChargeStation:
         """获取充电桩状态(见作业要求)
         """
         return StationStatus(
-            _id=self.id,
-            _type=self.type,
+            id=self.id,
+            type=self.type,
             status=self.status,
             charge_frequency=self.cumulative_charging_times - self.initial_cumulative_charging_times,
             charge_duration=self.cumulative_charging_duration - self.initial_cumulative_charging_duration,
-            charge_quantity=self.cumulative_charging_quantity - self.initial_cumulative_charging_quantity,
+            charge_quantity=self.cumulative_charging_quantity - self.initial_cumulative_charging_quantity
+        )
+    def get_stat(self) -> Statistics:
+        return Statistics(
+            _id=self.id,
+            _type=self.type,
             cumulative_charging_times=self.cumulative_charging_times,
             cumulative_charging_duration=self.cumulative_charging_duration,
             cumulative_charging_quantity=self.cumulative_charging_quantity,
@@ -142,7 +156,6 @@ class ChargeStation:
             cumulative_serviing_fee=self.cumulative_serviing_fee,
             cumulative_total_fee=self.cumulative_total_fee,
         )
-
     def __finish_tran(self, tran: Transaction):
         tran.finish()
         self.cumulative_charging_duration += tran.charge_time
@@ -171,7 +184,7 @@ class ChargeStation:
             return
         self.now_tran = tran
         tran.start(station_id=self.id)
-        self.t = Timer(real_time(tran.end_time,tran.start_time).total_seconds(), self.__finish_tran, (tran,))
+        self.t = Timer(real_time(tran.end_time, tran.start_time).total_seconds(), self.__finish_tran, (tran,))
         self.t.start()
 
     def cancel(self) -> None:
@@ -211,22 +224,28 @@ class StationMgmt:
             self.stations[s.id] = s
         self.f_id = 0
         self.s_id = 0
-    def get_slow_stations(self) ->List[int]:
+
+    def get_slow_stations(self) -> List[int]:
         return [i.id for i in self.slow]
 
-    def get_fast_stations(self) ->List[int]:
+    def get_fast_stations(self) -> List[int]:
         return [i.id for i in self.fast]
 
     def get_status(self) -> List[StationStatus]:
         status_list = []
-        for _id, station in self.stations:
-            status_list.append(station.get_status())
+        for _id in self.stations:
+            status_list.append(self.stations[_id].get_status())
+        return status_list
+    def get_statistics(self) -> List[Statistics]:
+        status_list = []
+        for _id in self.stations:
+            status_list.append(self.stations[_id].get_stat())
         return status_list
 
-    def turn_on(self,station_id:int):
+    def turn_on(self, station_id: int):
         self.stations[station_id].turn_on()
 
-    def turn_off(self,station_id:int):
+    def turn_off(self, station_id: int):
         self.stations[station_id].turn_off()
 
     # def turn_error(self,station_id:int):
@@ -244,4 +263,3 @@ class StationMgmt:
         """
         station = self.stations.get(station_id)
         station.start(tran=tran)
-
