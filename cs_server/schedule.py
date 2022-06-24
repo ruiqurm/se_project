@@ -689,3 +689,34 @@ class AreaMgmt:
 		if self.schedule_mode == 0:
 			self.waitId2area.pop(wait_id)
 		self.charging[station_id].pop(0)
+
+
+	def get_charging(self,station_id):
+		if self.charging.__contains__(station_id):
+			return self.charging[station_id]
+		else:
+			return []
+
+	def get_waiting(self,transaction_id)->(str,int):
+		mode=None
+		cnt=0
+		for i in reversed(self.waiting):
+			if i.mode==mode:
+				cnt+=1
+			if i.id==transaction_id:
+				mode=i.mode
+		if mode is not None:
+			return ("wait area",cnt)
+		cnt=0
+		now=None
+		for j,x in self.charging.items():
+			for i in reversed(x):
+				if now is not None:
+					cnt += 1
+				if i.id == transaction_id:
+					now=j
+			if now is not None:
+				break
+		if now is not None:
+			return (f"charging {now}",cnt)
+		return ("not exist",-1)
